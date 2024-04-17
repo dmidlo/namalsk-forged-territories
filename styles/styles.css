@@ -1,0 +1,34 @@
+/* Basic styles for the full viewport and the parallax container */
+body, html {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+}
+
+#parallaxContainer {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+#parallaxContainer > * {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    will-change: transform; /* Optimizes transformations */
+}
+
+/* Subtle fade at edges, enhancing focus on the center */
+#parallaxContainer::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: radial-gradient(circle, transparent, rgba(0, 0, 0, 0.5) 70%);
+    pointer-events: none; /* Allows mouse events to pass through */
+}
