@@ -2,33 +2,90 @@
 body, html {
     height: 100%;
     margin: 0;
+    background-color: black;
     overflow: hidden;
 }
 
 #parallaxContainer {
     position: relative;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
+    width: 100%;  /* Ensures the container is as wide as the viewport */
+    height: auto; /* Adjusts the height based on the content */
 }
 
 #parallaxContainer > * {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-size: cover;
-    background-position: center;
     will-change: transform; /* Optimizes transformations */
+    position: absolute; /* Positions all images absolutely within the container */
 }
 
-/* Subtle fade at edges, enhancing focus on the center */
-#parallaxContainer::before {
-    content: "";
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background: radial-gradient(circle, transparent, rgba(0, 0, 0, 0.5) 70%);
-    pointer-events: none; /* Allows mouse events to pass through */
+#canvas_12 {
+    top: 0;  /* Aligns images to the top of the container */
+    left: 0; /* Aligns images to the left of the container */
+    width: 100%; /* Full width to stretch images */
+    height: auto; /* Height adjusts automatically */
+    opacity: 0;
+}
+
+#skyscape_11 {
+    top: 0;  /* Aligns images to the top of the container */
+    left: 0; /* Aligns images to the left of the container */
+    width: 100%; /* Full width to stretch images */
+    height: auto; /* Height adjusts automatically */
+}
+
+#mountain-valley_09 {
+    top: 0;  /* Aligns images to the top of the container */
+    left: 0; /* Aligns images to the left of the container */
+    width: 100%; /* Full width to stretch images */
+    height: auto; /* Height adjusts automatically */
+}
+
+#mountainscape-far_10 {
+    top: 18.6em;
+    left: 28.3em;
+    width: 51.9em;
+    height: 11.9em;
+}
+
+#anomaly_08 {
+    top: 24em;
+    left: 34.2em;
+    width: 1.5em;
+    height: 1.5em;
+}
+
+#coal-mountain_07 {
+    top: 24.6em;
+    left: 40.4em;
+    width: 33.2em;
+}
+
+#factory_06 {
+    top: 18.3em;
+    left: 49.4em;
+    width: 23.4em;
+}
+
+#smoke_05 {
+    top: 0;
+    left: 54em;
+    width: 32.9em;
+}
+
+#mountain-tree-foreground-L_03 {
+    height: auto;
+}
+
+#mountain-foreground-R_04 {
+    height: auto;
+    right: 0;
+}
+
+#hero-rock_01 {
+    left: 34em;
+    top: 28.6em;
+}
+
+#logo_02 {
+    right: 7em;
+    top: 28.6em;
 }
