@@ -31,12 +31,16 @@ class Parallax {
             if (this.parallaxContainer.children.length > 0) {
                 return this.parallaxContainer.children[0] as HTMLElement;
             } else {
-                console.warn("No children in parallax container. Creating an empty div as fallback.");
-                return document.createElement('div'); // Creating an empty div if no children exist
+                console.warn("No children in parallax container. Creating an empty div with `id='layer-01'` as fallback.");
+
+                // Creating an empty div if no children exist
+                const fallbackDiv = document.createElement('div');
+                fallbackDiv.id = "layer-01"; // Setting the ID of the newly created div
+                return fallbackDiv;
             }
         }
         return base;
-    }    
+    }
 
     private initializeParallax(): void {
         this.updateContainerAndLayers();
@@ -60,16 +64,16 @@ class Parallax {
         const centerY = this.parallaxContainer.offsetHeight / 2;
         const mouseX = event.clientX - this.parallaxContainer.getBoundingClientRect().left;
         const mouseY = event.clientY - this.parallaxContainer.getBoundingClientRect().top;
-
+    
         this.layers.forEach(layer => {
-            const depth = parseFloat(layer.getAttribute('data-depth')!);
-            const maxRange = parseFloat(layer.getAttribute('data-maxRange')!);
-            const smoothingFactor = 0.13; // Adjusts the sensitivity
+            const depth = parseFloat(layer.getAttribute('data-depth')!) || 0; // Default to 0 if null
+            const maxRange = parseFloat(layer.getAttribute('data-maxRange')!) || 0; // Default to 0 if null
+            const smoothingFactor = 0.13;
             let deltaX = (mouseX - centerX) * depth * smoothingFactor;
             let deltaY = (mouseY - centerY) * depth * smoothingFactor;
             const boundX = Math.min(Math.max(deltaX, -maxRange), maxRange);
             const boundY = Math.min(Math.max(deltaY, -maxRange), maxRange);
-
+    
             layer.style.transform = `translate(${boundX}px, ${boundY}px)`;
         });
     }
