@@ -1,67 +1,60 @@
-/**
- * Parallax class to handle dynamic dimensional updates and interactive mouse parallax effects with responsiveness.
- */
-class Parallax {
-    private baseElement: HTMLElement; // Element used as the dimension anchor
-    private parallaxContainer: HTMLElement; // Container for all parallax layers
-    private layers: NodeListOf<HTMLElement>; // Collection of all parallax layers
-    private resizeObserver: ResizeObserver; // Observer to handle dimension changes
+interface LayerElement extends HTMLElement {
+    dataDepth: number;
+    dataMaxRange: number;
+}
 
-    /**
-     * Constructor to initialize the Parallax effect.
-     * @param containerId The ID of the container element that holds all parallax layers.
-     */
+interface ParallaxOptions {
+    containerId: string;
+}
+
+
+class Parallax {
+    private baseElement: HTMLElement;
+    private parallaxContainer: HTMLElement;
+    private layers: NodeListOf<HTMLElement>;
+    private resizeObserver: ResizeObserver;
+
     constructor(containerId: string) {
         this.parallaxContainer = document.getElementById(containerId) as HTMLElement;
         this.layers = this.parallaxContainer.querySelectorAll('[data-depth]');
         this.baseElement = this.findBaseElement();
-        this.resizeObserver = new ResizeObserver(() => {
-            this.updateContainerAndLayers();
-        });
+        this.resizeObserver = new ResizeObserver(() => this.updateContainerAndLayers());
 
-        this.setupInitialDimensions();
+        this.initializeParallax();
+    }
+
+    private findBaseElement(): HTMLElement {
+        const base = this.parallaxContainer.querySelector('[data-isBaseDimensions]') as HTMLElement;
+        if (!base) {
+            console.error("Base element with `data-isBaseDimensions` not found. Defaulting to first child.");
+            // If no base element is found, default to the first child if it exists, or create a new div as a fallback.
+            if (this.parallaxContainer.children.length > 0) {
+                return this.parallaxContainer.children[0] as HTMLElement;
+            } else {
+                console.warn("No children in parallax container. Creating an empty div as fallback.");
+                return document.createElement('div'); // Creating an empty div if no children exist
+            }
+        }
+        return base;
+    }    
+
+    private initializeParallax(): void {
+        this.updateContainerAndLayers();
         this.attachEvents();
         this.setupResizeObserver();
     }
 
-    /**
-     * Searches and returns the element with `data-isBaseDimensions`, expected to be exactly one.
-     * @returns The HTMLElement that is the base for dimension calculations.
-     */
-    private findBaseElement(): HTMLElement {
-        const base = this.parallaxContainer.querySelector('[data-isBaseDimensions]') as HTMLElement;
-        if (!base) throw new Error("Base element with `data-isBaseDimensions` not found.");
-        return base;
-      }
-
-    /**
-     * Initializes the container and layer dimensions based on the base element's size.
-     */
-    private setupInitialDimensions(): void {
-        this.updateContainerAndLayers();
-      }
-
-    /**
-     * Updates both the dimensions of the parallax container and its child layers to keep proportions responsive.
-     */
     private updateContainerAndLayers(): void {
         const baseWidth = this.baseElement.offsetWidth;
         const baseHeight = this.baseElement.offsetHeight;
         this.parallaxContainer.style.width = `${baseWidth}px`;
         this.parallaxContainer.style.height = `${baseHeight}px`;
-      }
+    }
 
-    /**
-     * Attaches mouse move event to enable interactive parallax effect.
-     */
     private attachEvents(): void {
-        document.addEventListener('mousemove', (event) => this.handleMouseMove(event)); // Event Delegation
-      }
+        document.addEventListener('mousemove', (event) => this.handleMouseMove(event));
+    }
 
-    /**
-     * Handles mouse movement to apply parallax effects on layers based on their depth and max range.
-     * @param event The mouse event containing the cursor's current coordinates.
-     */
     private handleMouseMove(event: MouseEvent): void {
         const centerX = this.parallaxContainer.offsetWidth / 2;
         const centerY = this.parallaxContainer.offsetHeight / 2;
@@ -71,9 +64,9 @@ class Parallax {
         this.layers.forEach(layer => {
             const depth = parseFloat(layer.getAttribute('data-depth')!);
             const maxRange = parseFloat(layer.getAttribute('data-maxRange')!);
-            const smoothingFactor = 0.13; // Adjusts the sensitivity of the parallax effect
-            const deltaX = (mouseX - centerX) * depth * smoothingFactor;
-            const deltaY = (mouseY - centerY) * depth * smoothingFactor;
+            const smoothingFactor = 0.13; // Adjusts the sensitivity
+            let deltaX = (mouseX - centerX) * depth * smoothingFactor;
+            let deltaY = (mouseY - centerY) * depth * smoothingFactor;
             const boundX = Math.min(Math.max(deltaX, -maxRange), maxRange);
             const boundY = Math.min(Math.max(deltaY, -maxRange), maxRange);
 
@@ -81,12 +74,9 @@ class Parallax {
         });
     }
 
-    /**
-     * Sets up a resize observer to dynamically adjust dimensions based on base element changes.
-     */
     private setupResizeObserver(): void {
         this.resizeObserver.observe(this.baseElement);
-      }
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
