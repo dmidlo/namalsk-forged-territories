@@ -29,63 +29,79 @@ body, html {
     top: 0;  /* Aligns images to the top of the container */
     left: 0; /* Aligns images to the left of the container */
     width: 100%; /* Full width to stretch images */
-    height: auto; /* Height adjusts automatically */
+    height: 55%; /* Height adjusts automatically */
 }
 
 #mountain-valley_09 {
     top: 0;  /* Aligns images to the top of the container */
     left: 0; /* Aligns images to the left of the container */
     width: 100%; /* Full width to stretch images */
-    height: auto; /* Height adjusts automatically */
+    height: 100%; /* Height adjusts automatically */
 }
 
 #mountainscape-far_10 {
-    top: 18.6em;
-    left: 28.3em;
-    width: 51.9em;
-    height: 11.9em;
+    top: 30%;
+    left: 25.6%;
+    width: 58%;
+    height: 29%;
 }
 
 #anomaly_08 {
-    top: 24em;
-    left: 34.2em;
-    width: 1.5em;
-    height: 1.5em;
+    top: 47.5%;
+    left: 31.9%;
+    width: 1.6%;
+    height: 2.8%;
 }
 
 #coal-mountain_07 {
-    top: 24.6em;
-    left: 40.4em;
-    width: 33.2em;
+    top: 45.5%;
+    left: 37.5%;
+    height: 17%;
+    width: 31.4%;
 }
 
 #factory_06 {
-    top: 18.3em;
-    left: 49.4em;
-    width: 23.4em;
+    top: 33.8%;
+    left: 45.9%;
+    height: 19.5%;
+    width: 21.15%;
 }
 
 #smoke_05 {
     top: 0;
-    left: 54em;
-    width: 32.9em;
+    left: 50%;
+    height: 35.2%;
+    width: 30.4%;
+}
+
+#mountain-tree-foreground-L_03, #mountain-foreground-R_04 {
+    max-height: 100%;  /* This will limit the height to not exceed the viewport height */
+    width: auto;  /* Maintain the natural aspect ratio of the image */
+    object-fit: contain;  /* Ensures the whole image is visible without distortion */
 }
 
 #mountain-tree-foreground-L_03 {
-    height: auto;
+    left: 0;  /* Align this image to the left side of the container */
+    top: 0;  /* Start at the middle of the container vertically */
+    /*transform: translateY(-50%);   Offset by half its height to center it vertically */
 }
 
 #mountain-foreground-R_04 {
-    height: auto;
-    right: 0;
+    right: 0;  /* Align this image to the right side of the container */
+    top: 0;  /* Start at the middle of the container vertically */
+    /*transform: translateY(-50%);   Offset by half its height to center it vertically */
 }
 
 #hero-rock_01 {
-    left: 34em;
-    top: 28.6em;
+    left: 33%;
+    bottom: 0;
+    height: 45%;
+    width: 43%;
 }
 
 #logo_02 {
-    right: 7em;
-    top: 28.6em;
+    right: 2%;
+    bottom: 2%;
+    height: 23%;
+    width: 12.5%;
 }
