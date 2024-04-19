@@ -16,13 +16,13 @@ class Parallax {
         this.layers = this.parallaxContainer.querySelectorAll('[data-depth]');
         this.baseElement = this.findBaseElement();
         this.resizeObserver = new ResizeObserver(() => {
-          this.updateContainerAndLayers();
+            this.updateContainerAndLayers();
         });
-    
+
         this.setupInitialDimensions();
         this.attachEvents();
         this.setupResizeObserver();
-      }
+    }
 
     /**
      * Searches and returns the element with `data-isBaseDimensions`, expected to be exactly one.
