@@ -5,26 +5,25 @@
  * parallax depth and movement range properties of each layer. It ensures smooth, responsive
  * interactions by adjusting the position of parallax layers relative to user interactions.
  *
- * @typeparam T - A type parameter that extends HTMLElement, representing the type of the base and layer elements within the parallax container.
+ * @typeparam T - Specifies that the type parameter T must be an HTMLElement or a subtype thereof.
  *
- * @property {T} baseElement - The primary layer that determines the dimensions of the parallax container.
- * @property {T} parallaxContainer - The main container that holds all parallax layers.
- * @property {NodeListOf<T>} children - A NodeList of all child elements within the container that are involved in the parallax effect.
- * @property {NodeListOf<ParallaxLayer>} layers - A NodeList of all configured parallax layer elements.
- * @property {ResizeObserver} resizeObserver - An observer to handle changes in the viewport size affecting the parallax container.
- * @property {ParallaxOptions} options - Configuration options for the parallax effect, including container ID and smoothing factor.
+ * @property {T} baseElement - The primary layer that defines the dimensions of the parallax container.
+ * @property {T} parallaxContainer - The main container element that holds all the parallax layers.
+ * @property {NodeListOf<T>} children - NodeList of child elements within the parallax container.
+ * @property {NodeListOf<ParallaxLayer>} layers - NodeList of all elements acting as parallax layers, each with additional properties for depth and movement range.
+ * @property {ResizeObserver} resizeObserver - Observer to detect and react to size changes in the parallax container.
+ * @property {ParallaxOptions} options - Configuration options for the parallax effect, such as container ID and smoothing factor.
+ * @property {number | undefined} moveTimeout - Optional number representing a timer set to regulate the frequency of handling mouse move events to optimize performance.
  *
- * @constructor
- * Initializes the parallax system, sets up the main container and layers, and attaches necessary event listeners for handling parallax effects.
- * Throws an error if the container specified by the options does not exist.
- *
- * @method initializeLayers - Initializes and configures the parallax layers setting their depth and maxRange properties from data attributes.
- * @method findBaseElement - Identifies the base element in the container used to define the dimensions and reference point for the parallax effect.
- * @method setupResizeObserver - Initializes a ResizeObserver to monitor and react to changes in the size of the base element.
- * @method updateContainerAndLayers - Updates the dimensions of the parallax container and layers based on the base element's size.
- * @method handleMouseMove - Handles mouse movement events, adjusting the position of each layer based on its configured properties.
- * @method initializeParallax - Sets up the foundational aspects of the parallax system including initial dimensions, positions, and event listeners.
- * @method attachEvents - Attaches mouse movement event listeners to the document for interactive parallax effects.
+ * @method constructor(options: ParallaxOptions) - Initializes the parallax effect within the specified container with optional smoothing behavior.
+ * @method private initializeLayers() - Sets up the parallax layers by defining their depth and max range from data attributes.
+ * @method private findBaseElement() - Identifies the base element that defines the container dimensions, using a designated attribute or defaulting to the first child.
+ * @method private setupResizeObserver() - Attaches a ResizeObserver to the base element to update parallax layer dimensions on resize events.
+ * @method private updateContainerAndLayers(baseWidth?: number, baseHeight?: number) - Updates the dimensions of the container and its layers to match the base element or specified dimensions.
+ * @method private debounceMouseMove(event: MouseEvent) - Throttles mouse movement handling to enhance performance and responsiveness.
+ * @method private handleMouseMove(event: MouseEvent) - Calculates and applies the movement of each parallax layer based on the mouse's position relative to the container's center.
+ * @method private initializeParallax() - Sets initial dimensions and positions, binds event listeners for interactive effects, and starts the resize observer.
+ * @method private attachEvents() - Binds necessary event handlers to enable dynamic interaction with the parallax system.
  */
 class Parallax {
     baseElement; // The base layer that defines the size of the parallax container.
