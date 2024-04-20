@@ -164,7 +164,6 @@ class Parallax {
     attachEvents() {
         document.addEventListener('mousemove', this.handleMouseMove.bind(this));
         window.addEventListener('resize', () => {
-            console.log(`Window size changed: ${window.innerWidth}x${window.innerHeight}`);
             this.updateContainerAndLayers(window.innerWidth);
         });
     }
