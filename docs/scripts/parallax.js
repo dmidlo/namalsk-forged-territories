@@ -176,8 +176,8 @@ class Parallax {
         if (beta === null || gamma === null)
             return; // If data is not available, exit.
         // Calculate movement based on the orientation. This can be adjusted for sensitivity.
-        const movementX = gamma * this.options.smoothingFactor;
-        const movementY = beta * this.options.smoothingFactor;
+        const movementX = gamma * 10 * this.options.smoothingFactor;
+        const movementY = beta * 10 * this.options.smoothingFactor;
         // Apply the movement to each layer
         this.layers.forEach(layer => {
             let deltaX = movementX * layer.depth;
