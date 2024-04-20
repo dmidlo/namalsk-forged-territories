@@ -15,6 +15,10 @@ interface ParallaxLayer extends HTMLElement {
     maxRange: number;
 }
 
+interface DeviceOrientationEventPermissions {
+    requestPermission: () => Promise<'granted' | 'denied' | 'prompt'>;
+}
+
 /**
  * Defines configuration options for setting up a parallax effect within a specified container.
  * This interface facilitates the customization of parallax behavior and visual responsiveness based on user interactions.
@@ -212,12 +216,12 @@ class Parallax<T extends HTMLElement> {
      *
      * @param event - The MouseEvent object containing details about the current mouse position and movement.
      */
-    private debounceDeviceOrientation(event: DeviceOrientationEvent): void {
-        clearTimeout(this.moveTimeout);
-        this.moveTimeout = setTimeout(() => {
-            this.handleDeviceOrientation(event)
-        }, 6);
-    }
+    // private debounceDeviceOrientation(event: DeviceOrientationEvent): void {
+    //     clearTimeout(this.moveTimeout);
+    //     this.moveTimeout = setTimeout(() => {
+    //         this.handleDeviceOrientation(event)
+    //     }, 6);
+    // }
 
     private handleDeviceOrientation(event: DeviceOrientationEvent): void {
         const { beta, gamma } = event; // Extract the relavant components of the orientation
@@ -250,6 +254,26 @@ class Parallax<T extends HTMLElement> {
         this.setupResizeObserver();  // Start observing for resize events.
     }
 
+    private async attachDeviceOrientationListener() {
+        // Check if DeviceOrientationEvent exists and supports the requestPermission method directly.
+        if (typeof DeviceOrientationEvent !== 'undefined' && 'requestPermission' in DeviceOrientationEvent) {
+            try {
+                // Perform a more appropriate cast to the specific interface handling permissions.
+                const permission = await (DeviceOrientationEvent as unknown as DeviceOrientationEventPermissions).requestPermission();
+                if (permission === 'granted') {
+                    window.addEventListener('deviceorientation', this.handleDeviceOrientation.bind(this));
+                }
+            } catch (error) {
+                console.error('Error requesting permission for device orientation:', error);
+            }
+        } else if ('ondeviceorientation' in window) {
+            // Add the event listener if the event is inherently supported without permissions.
+            window.addEventListener('deviceorientation', this.handleDeviceOrientation.bind(this));
+        } else {
+            console.error('Device orientation is not supported by this device.');
+        }
+    }
+
     /**
      * Attaches event listeners for mouse movements and window resizing to enable dynamic interaction with the parallax effects.
      * For mouse movements, it binds the `debounceMouseMove` method to the document to adjust the position of parallax layers based on cursor position.
@@ -258,10 +282,7 @@ class Parallax<T extends HTMLElement> {
      */
     private attachEvents(): void {
         document.addEventListener('mousemove', this.debounceMouseMove.bind(this));
-        
-        if (window.DeviceOrientationEvent) {
-            window.addEventListener('deviceorientation', this.debounceDeviceOrientation.bind(this));
-        }
+        this.attachDeviceOrientationListener();
 
         let resizeTimer: number;
         const resizeDelayMS: number = 6;
