@@ -206,6 +206,39 @@ class Parallax<T extends HTMLElement> {
     }
 
     /**
+     * Debounces the mouse move events to prevent excessive processing and ensure smoother performance.
+     * This method uses a timeout to limit the frequency of handling mouse move events, reducing the number of calls
+     * to `handleMouseMove` and thus improving performance, especially during fast and frequent mouse movements.
+     *
+     * @param event - The MouseEvent object containing details about the current mouse position and movement.
+     */
+    private debounceDeviceOrientation(event: DeviceOrientationEvent): void {
+        clearTimeout(this.moveTimeout);
+        this.moveTimeout = setTimeout(() => {
+            this.handleDeviceOrientation(event)
+        }, 6);
+    }
+
+    private handleDeviceOrientation(event: DeviceOrientationEvent): void {
+        const { beta, gamma } = event; // Extract the relavant components of the orientation
+        if (beta === null || gamma === null) return; // If data is not available, exit.
+
+        // Calculate movement based on the orientation. This can be adjusted for sensitivity.
+        const movementX = gamma! * this.options.smoothingFactor!;
+        const movementY = beta! * this.options.smoothingFactor!;
+
+        // Apply the movement to each layer
+        this.layers.forEach(layer => {
+            let deltaX = movementX * layer.depth;
+            let deltaY = movementY * layer.depth;
+            const boundX = Math.min(Math.max(deltaX, -layer.maxRange), layer.maxRange);
+            const boundY = Math.min(Math.max(deltaY, -layer.maxRange), layer.maxRange);
+
+            layer.style.transform = `translate(${boundX}px, ${boundY}px)`;
+        });
+    }
+
+    /**
      * Initializes the foundational aspects of the parallax system, including setting the initial dimensions
      * and positions of the layers, attaching mouse movement event listeners, and setting up a resize observer.
      * This method orchestrates the comprehensive setup required for enabling interactive parallax effects,
@@ -225,6 +258,10 @@ class Parallax<T extends HTMLElement> {
      */
     private attachEvents(): void {
         document.addEventListener('mousemove', this.debounceMouseMove.bind(this));
+        
+        if (window.DeviceOrientationEvent) {
+            window.addEventListener('deviceorientation', this.debounceDeviceOrientation.bind(this));
+        }
 
         let resizeTimer: number;
         const resizeDelayMS: number = 6;
