@@ -4,8 +4,13 @@ class Parallax {
     parallaxContainer;
     layers;
     resizeObserver;
-    constructor(containerId) {
-        this.parallaxContainer = document.getElementById(containerId);
+    options;
+    constructor(options) {
+        this.options = { ...options, smoothingFactor: 0.13 }; // Default smoothing factor
+        this.parallaxContainer = document.getElementById(options.containerId);
+        if (!this.parallaxContainer) {
+            throw new Error(`Element with ID '${options.containerId}' not found.`);
+        }
         this.layers = this.parallaxContainer.querySelectorAll('[data-depth]');
         this.baseElement = this.findBaseElement();
         this.resizeObserver = new ResizeObserver(() => this.updateContainerAndLayers());
@@ -15,13 +20,15 @@ class Parallax {
         const base = this.parallaxContainer.querySelector('[data-isBaseDimensions]');
         if (!base) {
             console.error("Base element with `data-isBaseDimensions` not found. Defaulting to first child.");
-            // If no base element is found, default to the first child if it exists, or create a new div as a fallback.
             if (this.parallaxContainer.children.length > 0) {
                 return this.parallaxContainer.children[0];
             }
             else {
                 console.warn("No children in parallax container. Creating an empty div as fallback.");
-                return document.createElement('div'); // Creating an empty div if no children exist
+                const fallbackDiv = document.createElement('div');
+                fallbackDiv.id = "layer-01";
+                this.parallaxContainer.appendChild(fallbackDiv);
+                return fallbackDiv;
             }
         }
         return base;
@@ -38,7 +45,7 @@ class Parallax {
         this.parallaxContainer.style.height = `${baseHeight}px`;
     }
     attachEvents() {
-        document.addEventListener('mousemove', (event) => this.handleMouseMove(event));
+        document.addEventListener('mousemove', this.handleMouseMove.bind(this));
     }
     handleMouseMove(event) {
         const centerX = this.parallaxContainer.offsetWidth / 2;
@@ -46,11 +53,10 @@ class Parallax {
         const mouseX = event.clientX - this.parallaxContainer.getBoundingClientRect().left;
         const mouseY = event.clientY - this.parallaxContainer.getBoundingClientRect().top;
         this.layers.forEach(layer => {
-            const depth = parseFloat(layer.getAttribute('data-depth'));
-            const maxRange = parseFloat(layer.getAttribute('data-maxRange'));
-            const smoothingFactor = 0.13; // Adjusts the sensitivity
-            let deltaX = (mouseX - centerX) * depth * smoothingFactor;
-            let deltaY = (mouseY - centerY) * depth * smoothingFactor;
+            const depth = parseFloat(layer.getAttribute('data-depth')) || 0;
+            const maxRange = parseFloat(layer.getAttribute('data-maxRange')) || 0;
+            let deltaX = (mouseX - centerX) * depth * this.options.smoothingFactor;
+            let deltaY = (mouseY - centerY) * depth * this.options.smoothingFactor;
             const boundX = Math.min(Math.max(deltaX, -maxRange), maxRange);
             const boundY = Math.min(Math.max(deltaY, -maxRange), maxRange);
             layer.style.transform = `translate(${boundX}px, ${boundY}px)`;
@@ -61,6 +67,6 @@ class Parallax {
     }
 }
 document.addEventListener('DOMContentLoaded', () => {
-    new Parallax('parallaxContainer');
+    new Parallax({ containerId: 'parallaxContainer' });
 });
 //# sourceMappingURL=parallax.js.map

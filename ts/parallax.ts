@@ -5,38 +5,43 @@ interface LayerElement extends HTMLElement {
 
 interface ParallaxOptions {
     containerId: string;
+    smoothingFactor?: number;
 }
 
-
-class Parallax {
-    private baseElement: HTMLElement;
-    private parallaxContainer: HTMLElement;
-    private layers: NodeListOf<HTMLElement>;
+class Parallax<T extends HTMLElement> {
+    private baseElement: T;
+    private parallaxContainer: T;
+    private layers: NodeListOf<T>;
     private resizeObserver: ResizeObserver;
+    private options: ParallaxOptions;
 
-    constructor(containerId: string) {
-        this.parallaxContainer = document.getElementById(containerId) as HTMLElement;
-        this.layers = this.parallaxContainer.querySelectorAll('[data-depth]');
+    constructor(options: ParallaxOptions) {
+        this.options = { ...options, smoothingFactor: 0.13 }; // Default smoothing factor
+        this.parallaxContainer = document.getElementById(options.containerId) as T;
+
+        if (!this.parallaxContainer) {
+            throw new Error(`Element with ID '${options.containerId}' not found.`);
+        }
+
+        this.layers = this.parallaxContainer.querySelectorAll<T>('[data-depth]');
         this.baseElement = this.findBaseElement();
         this.resizeObserver = new ResizeObserver(() => this.updateContainerAndLayers());
 
         this.initializeParallax();
     }
 
-    private findBaseElement(): HTMLElement {
-        const base = this.parallaxContainer.querySelector('[data-isBaseDimensions]') as HTMLElement;
+    private findBaseElement(): T {
+        const base = this.parallaxContainer.querySelector<T>('[data-isBaseDimensions]');
         if (!base) {
             console.error("Base element with `data-isBaseDimensions` not found. Defaulting to first child.");
-            // If no base element is found, default to the first child if it exists, or create a new div as a fallback.
             if (this.parallaxContainer.children.length > 0) {
-                return this.parallaxContainer.children[0] as HTMLElement;
+                return this.parallaxContainer.children[0] as T;
             } else {
-                console.warn("No children in parallax container. Creating an empty div with `id='layer-01'` as fallback.");
-
-                // Creating an empty div if no children exist
+                console.warn("No children in parallax container. Creating an empty div as fallback.");
                 const fallbackDiv = document.createElement('div');
-                fallbackDiv.id = "layer-01"; // Setting the ID of the newly created div
-                return fallbackDiv;
+                fallbackDiv.id = "layer-01";
+                this.parallaxContainer.appendChild(fallbackDiv);
+                return fallbackDiv as unknown as T;
             }
         }
         return base;
@@ -56,7 +61,7 @@ class Parallax {
     }
 
     private attachEvents(): void {
-        document.addEventListener('mousemove', (event) => this.handleMouseMove(event));
+        document.addEventListener('mousemove', this.handleMouseMove.bind(this));
     }
 
     private handleMouseMove(event: MouseEvent): void {
@@ -64,16 +69,15 @@ class Parallax {
         const centerY = this.parallaxContainer.offsetHeight / 2;
         const mouseX = event.clientX - this.parallaxContainer.getBoundingClientRect().left;
         const mouseY = event.clientY - this.parallaxContainer.getBoundingClientRect().top;
-    
+
         this.layers.forEach(layer => {
-            const depth = parseFloat(layer.getAttribute('data-depth')!) || 0; // Default to 0 if null
-            const maxRange = parseFloat(layer.getAttribute('data-maxRange')!) || 0; // Default to 0 if null
-            const smoothingFactor = 0.13;
-            let deltaX = (mouseX - centerX) * depth * smoothingFactor;
-            let deltaY = (mouseY - centerY) * depth * smoothingFactor;
+            const depth = parseFloat(layer.getAttribute('data-depth')!) || 0;
+            const maxRange = parseFloat(layer.getAttribute('data-maxRange')!) || 0;
+            let deltaX = (mouseX - centerX) * depth * this.options.smoothingFactor!;
+            let deltaY = (mouseY - centerY) * depth * this.options.smoothingFactor!;
             const boundX = Math.min(Math.max(deltaX, -maxRange), maxRange);
             const boundY = Math.min(Math.max(deltaY, -maxRange), maxRange);
-    
+
             layer.style.transform = `translate(${boundX}px, ${boundY}px)`;
         });
     }
@@ -84,5 +88,5 @@ class Parallax {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    new Parallax('parallaxContainer');
+    new Parallax<HTMLElement>({ containerId: 'parallaxContainer' });
 });
