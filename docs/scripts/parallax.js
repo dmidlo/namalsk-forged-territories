@@ -69,7 +69,7 @@ class Parallax {
     initializeLayers() {
         const layers = Array.from(this.children).map(layer => {
             const depth = parseFloat(layer.getAttribute('data-depth') ?? '0');
-            const maxRange = parseFloat(layer.getAttribute('data-maxRange') ?? '0');
+            const maxRange = parseFloat(layer.getAttribute('data-max-range') ?? '0');
             Object.assign(layer, { depth, maxRange });
             return layer;
         });
@@ -85,9 +85,9 @@ class Parallax {
      * @throws {Error} If no base element is found and no children are present in the container, an error is logged and a fallback div is created and returned.
      */
     findBaseElement() {
-        const base = this.parallaxContainer.querySelector('[data-isBaseDimensions]'); // Get element marked as base dimensions.
+        const base = this.parallaxContainer.querySelector('[data-is-base-dimensions]'); // Get element marked as base dimensions.
         if (!base) {
-            console.error("Base element with `data-isBaseDimensions` not found. Defaulting to first child.");
+            console.error("Base element with `data-is-base-dimensions` not found. Defaulting to first child.");
             // Default to first child if no base element is found or create a fallback if no children exist.
             if (this.parallaxContainer.children.length > 0) {
                 return this.parallaxContainer.children[0];
