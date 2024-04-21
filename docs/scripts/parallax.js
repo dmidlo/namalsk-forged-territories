@@ -161,33 +161,22 @@ class Parallax {
         });
     }
     handleDeviceOrientation(event) {
-        const { beta, gamma } = event; // Extract the relevant components of the orientation
+        const { beta, gamma } = event;
         if (beta === null || gamma === null) {
-            return; // If data is not available, exit.
+            return; // Exit if essential data is missing.
         }
-        // Determine movement based on orientation
-        let movementX = 0;
-        let movementY = 0;
-        if (window.innerWidth > window.innerHeight) {
-            // Landscape mode: map gamma to X and beta to Y
-            movementX = gamma;
-            movementY = beta;
-        }
-        else {
-            // Portrait mode: map gamma to Y and beta to X
-            movementX = beta;
-            movementY = gamma;
-        }
-        // Apply a scaling factor and add a smoothing factor
-        const scaleFactor = this.options.gyroEffectModifier || 1;
-        const smoothingFactor = this.options.smoothingFactor || 0.1;
-        movementX *= scaleFactor;
-        movementY *= scaleFactor;
-        // Update each layer's transformation
+        // Calculate movement assuming the phone is in normal portrait orientation.
+        let movementX = gamma; // Tilt left-to-right affects horizontal movement.
+        let movementY = beta; // Tilt front-to-back affects vertical movement.
+        // Apply the gyro effect modifier and a smoothing factor for each movement.
+        const gyroEffect = this.options.gyroEffectModifier || 10;
+        const smoothing = this.options.smoothingFactor || 0.13;
+        movementX *= gyroEffect * smoothing;
+        movementY *= gyroEffect * smoothing;
+        // Update each layer's position based on calculated movements and depth.
         this.layers.forEach(layer => {
-            let deltaX = movementX * layer.depth * smoothingFactor;
-            let deltaY = movementY * layer.depth * smoothingFactor;
-            // Clamp the movement to within the max range
+            const deltaX = movementX * layer.depth;
+            const deltaY = movementY * layer.depth;
             const boundX = Math.min(Math.max(deltaX, -layer.maxRange), layer.maxRange);
             const boundY = Math.min(Math.max(deltaY, -layer.maxRange), layer.maxRange);
             layer.style.transform = `translate(${boundX}px, ${boundY}px)`;
