@@ -172,9 +172,10 @@ class Parallax {
     //     }, 6);
     // }
     handleDeviceOrientation(event) {
-        const { beta, gamma } = event; // Extract the relavant components of the orientation
-        if (beta === null || gamma === null)
-            return; // If data is not available, exit.
+        const { beta, gamma } = event; // Extract the relevant components of the orientation
+        if (beta === null || gamma === null) {
+            return;
+        } // If data is not available, exit.
         // Calculate movement based on the orientation. This can be adjusted for sensitivity.
         const movementX = gamma * 10 * this.options.smoothingFactor;
         const movementY = beta * 10 * this.options.smoothingFactor;
@@ -199,22 +200,38 @@ class Parallax {
         this.setupResizeObserver(); // Start observing for resize events.
     }
     async attachDeviceOrientationListener() {
+        // A function to actually add the device orientation event listener
+        const addOrientationListener = () => {
+            window.addEventListener('deviceorientation', this.handleDeviceOrientation.bind(this));
+        };
         // Check if DeviceOrientationEvent exists and supports the requestPermission method directly.
         if (typeof DeviceOrientationEvent !== 'undefined' && 'requestPermission' in DeviceOrientationEvent) {
-            try {
-                // Perform a more appropriate cast to the specific interface handling permissions.
-                const permission = await DeviceOrientationEvent.requestPermission();
-                if (permission === 'granted') {
-                    window.addEventListener('deviceorientation', this.handleDeviceOrientation.bind(this));
+            // Add a temporary listener to the document that will request permission on user interaction
+            const requestPermissionOnUserGesture = async () => {
+                // Prevent multiple triggers
+                document.removeEventListener('click', requestPermissionOnUserGesture);
+                document.removeEventListener('touchend', requestPermissionOnUserGesture);
+                try {
+                    // Perform a more appropriate cast to the specific interface handling permissions.
+                    const permission = await DeviceOrientationEvent.requestPermission();
+                    if (permission === 'granted') {
+                        addOrientationListener();
+                    }
+                    else {
+                        console.error('Permission for device orientation was denied.');
+                    }
                 }
-            }
-            catch (error) {
-                console.error('Error requesting permission for device orientation:', error);
-            }
+                catch (error) {
+                    console.error('Error requesting permission for device orientation:', error);
+                }
+            };
+            // Listen for the first user interaction to trigger permission request
+            document.addEventListener('click', requestPermissionOnUserGesture);
+            document.addEventListener('touchend', requestPermissionOnUserGesture);
         }
         else if ('ondeviceorientation' in window) {
             // Add the event listener if the event is inherently supported without permissions.
-            window.addEventListener('deviceorientation', this.handleDeviceOrientation.bind(this));
+            addOrientationListener();
         }
         else {
             console.error('Device orientation is not supported by this device.');
