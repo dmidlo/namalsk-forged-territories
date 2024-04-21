@@ -68,7 +68,7 @@ class Parallax<T extends HTMLElement> {
     private layers: NodeListOf<ParallaxLayer>;  // Collection of all parallax layer elements.
     private resizeObserver: ResizeObserver;  // Observer to handle resizing of the viewport.
     private options: ParallaxOptions;  // Configuration options for the parallax effect.
-    private moveTimeout: number | undefined;
+    private moveTimeout: number | undefined;  // debounce timer for mousemouse events.
 
     /**
      * Constructs a new Parallax instance with specified configuration options.
@@ -215,14 +215,23 @@ class Parallax<T extends HTMLElement> {
           return;
         } // If data is not available, exit.
 
+        let movementX: number;
+        let movementY: number;
+
         // Calculate movement based on the orientation. This can be adjusted for sensitivity.
-        const movementX = beta * 10 * this.options.smoothingFactor!;
-        const movementY = gamma * 10 * this.options.smoothingFactor!;
+        if (window.innerWidth > window.innerHeight) {
+            movementX = gamma * this.options.smoothingFactor!;
+            movementY = beta * this.options.smoothingFactor!;
+        } else {
+            movementX = beta * this.options.smoothingFactor!;
+            movementY = gamma * this.options.smoothingFactor!;
+        }
 
         // Apply the movement to each layer
         this.layers.forEach(layer => {
             let deltaX = movementX * layer.depth;
             let deltaY = movementY * layer.depth;
+
             const boundX = Math.min(Math.max(deltaX, -layer.maxRange), layer.maxRange);
             const boundY = Math.min(Math.max(deltaY, -layer.maxRange), layer.maxRange);
 

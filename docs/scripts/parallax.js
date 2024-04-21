@@ -32,7 +32,7 @@ class Parallax {
     layers; // Collection of all parallax layer elements.
     resizeObserver; // Observer to handle resizing of the viewport.
     options; // Configuration options for the parallax effect.
-    moveTimeout;
+    moveTimeout; // debounce timer for mousemouse events.
     /**
      * Constructs a new Parallax instance with specified configuration options.
      * Initializes the main container and layer elements, sets up the resize observer,
@@ -163,9 +163,17 @@ class Parallax {
         if (beta === null || gamma === null) {
             return;
         } // If data is not available, exit.
+        let movementX;
+        let movementY;
         // Calculate movement based on the orientation. This can be adjusted for sensitivity.
-        const movementX = beta * 10 * this.options.smoothingFactor;
-        const movementY = gamma * 10 * this.options.smoothingFactor;
+        if (window.innerWidth > window.innerHeight) {
+            movementX = gamma * this.options.smoothingFactor;
+            movementY = beta * this.options.smoothingFactor;
+        }
+        else {
+            movementX = beta * this.options.smoothingFactor;
+            movementY = gamma * this.options.smoothingFactor;
+        }
         // Apply the movement to each layer
         this.layers.forEach(layer => {
             let deltaX = movementX * layer.depth;
