@@ -29,10 +29,13 @@ interface DeviceOrientationEventPermissions {
  * @property {number} [smoothingFactor] - Optional smoothing factor that modulates the responsiveness and smoothness
  *                                       of the parallax motion. Higher values result in more fluid, but slower reactions to
  *                                       mouse movements. If not provided, a default value is used.
+ * @property {number} [gyroEffectModifier] - Optional effect modifier that adds additional movement to DeviceOrientationEvents.
+ *                                           Higher values increase the amount of movement added.
  */
 interface ParallaxOptions {
     containerId: string;
     smoothingFactor?: number;
+    gyroEffectModifier?: number;
 }
 
 /**
@@ -170,6 +173,10 @@ class Parallax<T extends HTMLElement> {
         this.parallaxContainer.style.height = `${baseHeight}px`;  // Set the container's height.
     }
 
+    private getCenterXY(): [number, number] {
+        return [this.parallaxContainer.offsetHeight / 2, this.parallaxContainer.offsetHeight / 2];
+    }
+
     /**
      * Debounces the mouse move events to prevent excessive processing and ensure smoother performance.
      * This method uses a timeout to limit the frequency of handling mouse move events, reducing the number of calls
@@ -193,8 +200,7 @@ class Parallax<T extends HTMLElement> {
      * @param event - The MouseEvent object containing details about the current mouse position.
      */
     private handleMouseMove(event: MouseEvent): void {
-        const centerX = this.parallaxContainer.offsetWidth / 2;  // Calculate the center X of the container.
-        const centerY = this.parallaxContainer.offsetHeight / 2;  // Calculate the center Y of the container.
+        const [centerX, centerY] = this.getCenterXY();
         const mouseX = event.clientX - this.parallaxContainer.getBoundingClientRect().left;  // Mouse X relative to container.
         const mouseY = event.clientY - this.parallaxContainer.getBoundingClientRect().top;  // Mouse Y relative to container.
 
@@ -228,8 +234,8 @@ class Parallax<T extends HTMLElement> {
         }
 
         // This can be adjusted for sensitivity.
-        movementX *= this.options.smoothingFactor!;
-        movementY *= this.options.smoothingFactor!;
+        movementX *= this.options.gyroEffectModifier! + this.options.smoothingFactor!;
+        movementY *= this.options.gyroEffectModifier! + this.options.smoothingFactor!;
 
         // Apply the movement to each layer
         this.layers.forEach(layer => {
@@ -324,5 +330,5 @@ class Parallax<T extends HTMLElement> {
  * has been fully loaded and parsed, ensuring that all elements referenced in the script are accessible.
  */
 document.addEventListener('DOMContentLoaded', () => {
-    new Parallax<HTMLElement>({ containerId: 'parallaxContainer', smoothingFactor: 0.13 });
+    new Parallax<HTMLElement>({ containerId: 'parallaxContainer', smoothingFactor: 0.13, gyroEffectModifier: 10 });
 });

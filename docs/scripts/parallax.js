@@ -123,6 +123,9 @@ class Parallax {
         this.parallaxContainer.style.width = `${baseWidth}px`; // Set the container's width.
         this.parallaxContainer.style.height = `${baseHeight}px`; // Set the container's height.
     }
+    getCenterXY() {
+        return [this.parallaxContainer.offsetHeight / 2, this.parallaxContainer.offsetHeight / 2];
+    }
     /**
      * Debounces the mouse move events to prevent excessive processing and ensure smoother performance.
      * This method uses a timeout to limit the frequency of handling mouse move events, reducing the number of calls
@@ -145,8 +148,7 @@ class Parallax {
      * @param event - The MouseEvent object containing details about the current mouse position.
      */
     handleMouseMove(event) {
-        const centerX = this.parallaxContainer.offsetWidth / 2; // Calculate the center X of the container.
-        const centerY = this.parallaxContainer.offsetHeight / 2; // Calculate the center Y of the container.
+        const [centerX, centerY] = this.getCenterXY();
         const mouseX = event.clientX - this.parallaxContainer.getBoundingClientRect().left; // Mouse X relative to container.
         const mouseY = event.clientY - this.parallaxContainer.getBoundingClientRect().top; // Mouse Y relative to container.
         // Adjust each layer based on its depth and max range, applying the smoothing factor.
@@ -175,8 +177,8 @@ class Parallax {
             movementY = gamma;
         }
         // This can be adjusted for sensitivity.
-        movementX *= this.options.smoothingFactor;
-        movementY *= this.options.smoothingFactor;
+        movementX *= this.options.gyroEffectModifier + this.options.smoothingFactor;
+        movementY *= this.options.gyroEffectModifier + this.options.smoothingFactor;
         // Apply the movement to each layer
         this.layers.forEach(layer => {
             let deltaX = movementX * layer.depth;
@@ -263,6 +265,6 @@ class Parallax {
  * has been fully loaded and parsed, ensuring that all elements referenced in the script are accessible.
  */
 document.addEventListener('DOMContentLoaded', () => {
-    new Parallax({ containerId: 'parallaxContainer', smoothingFactor: 0.13 });
+    new Parallax({ containerId: 'parallaxContainer', smoothingFactor: 0.13, gyroEffectModifier: 10 });
 });
 //# sourceMappingURL=parallax.js.map
