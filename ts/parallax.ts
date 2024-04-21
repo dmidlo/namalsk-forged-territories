@@ -218,36 +218,41 @@ class Parallax<T extends HTMLElement> {
     private handleDeviceOrientation(event: DeviceOrientationEvent): void {
         const { beta, gamma } = event; // Extract the relevant components of the orientation
         if (beta === null || gamma === null) {
-          return;
-        } // If data is not available, exit.
-
-        let movementX: number;
-        let movementY: number;
-
-        // Calculate movement based on the orientation. 
+            return; // If data is not available, exit.
+        }
+    
+        // Determine movement based on orientation
+        let movementX: number = 0;
+        let movementY: number = 0;
+    
         if (window.innerWidth > window.innerHeight) {
+            // Landscape mode: map gamma to X and beta to Y
             movementX = gamma;
             movementY = beta;
         } else {
+            // Portrait mode: map gamma to Y and beta to X
             movementX = beta;
             movementY = gamma;
         }
-
-        // This can be adjusted for sensitivity.
-        movementX *= this.options.gyroEffectModifier! + this.options.smoothingFactor!;
-        movementY *= this.options.gyroEffectModifier! + this.options.smoothingFactor!;
-
-        // Apply the movement to each layer
+    
+        // Apply a scaling factor and add a smoothing factor
+        const scaleFactor = this.options.gyroEffectModifier! || 1;
+        const smoothingFactor = this.options.smoothingFactor || 0.1;
+        movementX *= scaleFactor;
+        movementY *= scaleFactor;
+    
+        // Update each layer's transformation
         this.layers.forEach(layer => {
-            let deltaX = movementX * layer.depth;
-            let deltaY = movementY * layer.depth;
-
+            let deltaX = movementX * layer.depth * smoothingFactor;
+            let deltaY = movementY * layer.depth * smoothingFactor;
+    
+            // Clamp the movement to within the max range
             const boundX = Math.min(Math.max(deltaX, -layer.maxRange), layer.maxRange);
             const boundY = Math.min(Math.max(deltaY, -layer.maxRange), layer.maxRange);
-
+    
             layer.style.transform = `translate(${boundX}px, ${boundY}px)`;
         });
-    }
+    }    
 
     /**
      * Initializes the foundational aspects of the parallax system, including setting the initial dimensions
