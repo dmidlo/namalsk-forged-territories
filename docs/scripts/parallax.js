@@ -165,15 +165,18 @@ class Parallax {
         } // If data is not available, exit.
         let movementX;
         let movementY;
-        // Calculate movement based on the orientation. This can be adjusted for sensitivity.
+        // Calculate movement based on the orientation. 
         if (window.innerWidth > window.innerHeight) {
-            movementX = gamma * this.options.smoothingFactor;
-            movementY = beta * this.options.smoothingFactor;
+            movementX = gamma;
+            movementY = beta;
         }
         else {
-            movementX = beta * this.options.smoothingFactor;
-            movementY = gamma * this.options.smoothingFactor;
+            movementX = beta;
+            movementY = gamma;
         }
+        // This can be adjusted for sensitivity.
+        movementX *= this.options.smoothingFactor;
+        movementY *= this.options.smoothingFactor;
         // Apply the movement to each layer
         this.layers.forEach(layer => {
             let deltaX = movementX * layer.depth;
