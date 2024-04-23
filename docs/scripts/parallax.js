@@ -92,7 +92,7 @@ class Parallax {
     }
     computeSensitivity() {
         const aspectRatio = window.innerWidth / window.innerHeight;
-        return aspectRatio * 10; // Multiply aspect ratio by 10 to derive a basic sensitivity level.
+        return aspectRatio * 2; // Multiply aspect ratio by 10 to derive a basic sensitivity level.
     }
     onCalibrationTimer() {
         // Resets the calibration flag to trigger new calibration on the next appropriate event
@@ -103,11 +103,11 @@ class Parallax {
         clearTimeout(this.calibrationTimer);
         this.calibrationTimer = window.setTimeout(() => this.onCalibrationTimer(), delay);
     }
-    // private calibrate(x?: boolean, y?: boolean): void {
-    //     // Optionally set calibration axis
-    //     this.calibrateX = x !== undefined ? x : this.calibrateX;
-    //     this.calibrateY = y !== undefined ? y : this.calibrateY;
-    // }
+    calibrate(x, y) {
+        // Optionally set calibration axis
+        this.calibrateX = x !== undefined ? x : this.calibrateX;
+        this.calibrateY = y !== undefined ? y : this.calibrateY;
+    }
     applyCalibration(inputX, inputY) {
         // Apply calibration to input values. If the difference between input and calibration exceeds the threshold, adjust the input by subtracting the calibration offset.
         if (Math.abs(inputX - this.calibrationX) > this.calibrationThreshold) {

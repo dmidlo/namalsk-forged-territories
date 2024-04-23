@@ -141,7 +141,7 @@ class Parallax<T extends HTMLElement> {
 
     private computeSensitivity(): number {
         const aspectRatio = window.innerWidth / window.innerHeight;
-        return aspectRatio * 10;  // Multiply aspect ratio by 10 to derive a basic sensitivity level.
+        return aspectRatio * 2;  // Multiply aspect ratio by 10 to derive a basic sensitivity level.
     }
 
     private onCalibrationTimer(): void {
@@ -155,11 +155,11 @@ class Parallax<T extends HTMLElement> {
         this.calibrationTimer = window.setTimeout(() => this.onCalibrationTimer(), delay);
     }
 
-    // private calibrate(x?: boolean, y?: boolean): void {
-    //     // Optionally set calibration axis
-    //     this.calibrateX = x !== undefined ? x : this.calibrateX;
-    //     this.calibrateY = y !== undefined ? y : this.calibrateY;
-    // }
+    public calibrate(x?: boolean, y?: boolean): void {
+        // Optionally set calibration axis
+        this.calibrateX = x !== undefined ? x : this.calibrateX;
+        this.calibrateY = y !== undefined ? y : this.calibrateY;
+    }
 
     private applyCalibration(inputX: number, inputY: number): [number, number] {
         // Apply calibration to input values. If the difference between input and calibration exceeds the threshold, adjust the input by subtracting the calibration offset.
