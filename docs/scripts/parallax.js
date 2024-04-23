@@ -8,6 +8,8 @@ class Parallax {
     options; // Configurable options for behavior and responsiveness.
     inputX = 0; // Default initialization to 0 to ensure value is always defined.
     inputY = 0; // Default initialization to 0 to ensure value is always defined.
+    initialOrientation = { beta: null, gamma: null };
+    continuousCalibrationData = { beta: [], gamma: [] };
     calibrationThreshold = 100;
     calibrationDelay = 500;
     supportDelay = 500;
@@ -20,8 +22,8 @@ class Parallax {
     attachDeviceOrientationListener; // Asynchronously attaches a device orientation event listener.
     constructor(options) {
         const defaults = {
-            smoothingFactor: 0.13, // Default smoothing factor for movement smoothness.
-            gyroEffectModifier: 10, // Default gyro effect modifier for device orientation sensitivity.
+            mouseSmoothingFactor: 0.13, // Default smoothing factor for movement smoothness.
+            gyroEffectModifier: 2, // Default gyro effect modifier for device orientation sensitivity.
             mouseDebounce: 6, // Milliseconds delay before re-polling mouse coordinates.
             windowResizeDebounce: 6, // Milliseconds delay before re-polling window dimensions during resize events.
             deviceDebounce: 6, // Milliseconds delay before re-polling device motion and event metrics.
@@ -94,6 +96,15 @@ class Parallax {
         const aspectRatio = window.innerWidth / window.innerHeight;
         return aspectRatio * 2; // Multiply aspect ratio by 10 to derive a basic sensitivity level.
     }
+    initialOrientationCalibration() {
+        window.addEventListener('deviceorientation', (event) => {
+            if (this.initialOrientation.beta === null || this.initialOrientation.gamma === null) {
+                this.initialOrientation.beta = event.beta;
+                this.initialOrientation.gamma = event.gamma;
+                window.removeEventListener('deviceorientation', this.initialOrientationCalibration);
+            }
+        });
+    }
     onCalibrationTimer() {
         // Resets the calibration flag to trigger new calibration on the next appropriate event
         this.calibrationFlag = true;
@@ -122,9 +133,12 @@ class Parallax {
         if (beta === null || gamma === null) {
             return;
         }
+        // Continuously update calibration
+        const averageBeta = this.continuousCalibrationData.beta.reduce((a, b) => a + b, 0) / this.continuousCalibrationData.beta.length;
+        const averageGamma = this.continuousCalibrationData.gamma.reduce((a, b) => a + b, 0) / this.continuousCalibrationData.gamma.length;
         const isPortrait = window.innerHeight > window.innerWidth;
-        let inputX = isPortrait ? gamma : beta;
-        let inputY = isPortrait ? beta : gamma;
+        let inputX = isPortrait ? gamma - averageGamma : beta - averageBeta;
+        let inputY = isPortrait ? beta - averageBeta : gamma - averageGamma;
         if (this.calibrationFlag) {
             this.calibrationFlag = false;
             this.calibrationX = inputX;
@@ -142,7 +156,7 @@ class Parallax {
         this.inputX = mouseX / centerX;
         this.inputY = mouseY / centerY;
         window.requestAnimationFrame(() => {
-            this.applyLayerTransformations(this.options.smoothingFactor, this.options.smoothingFactor, 'mouse');
+            this.applyLayerTransformations(this.options.mouseSmoothingFactor, this.options.mouseSmoothingFactor, 'mouse');
         });
     }
     handleDeviceOrientation(event) {
@@ -161,7 +175,13 @@ class Parallax {
         if (event.rotationRate) {
             const { beta, gamma } = event.rotationRate;
             if (beta !== null && gamma !== null) {
+                this.continuousCalibrationData.beta.push(beta);
+                this.continuousCalibrationData.gamma.push(gamma);
                 // Use the rotate method to adjust inputX and inputY based on the device orientation
+                if (this.continuousCalibrationData.beta.length > 50) { // Adjust buffer size as needed
+                    this.continuousCalibrationData.beta.shift();
+                    this.continuousCalibrationData.gamma.shift();
+                }
                 this.rotate(beta, gamma);
                 const motionModifier = this.options.gyroEffectModifier ?? 10;
                 window.requestAnimationFrame(() => {
@@ -218,6 +238,7 @@ class Parallax {
                 if (permission === 'granted') {
                     // Use support delay to debounce the addition of orientation and motion listeners
                     setTimeout(addOrientationAndMotionListeners, this.supportDelay);
+                    this.initialOrientationCalibration();
                 }
                 else {
                     console.error('Permission for device orientation was denied.');
@@ -230,6 +251,7 @@ class Parallax {
         else if ('ondeviceorientation' in window && 'ondevicemotion' in window) {
             // No permission needed, but supported; still apply support delay before attaching event listeners
             setTimeout(addOrientationAndMotionListeners, this.supportDelay);
+            this.initialOrientationCalibration();
         }
         else {
             console.error('Device orientation or motion is not supported by this device.');
@@ -277,6 +299,6 @@ class Parallax {
     }
 }
 document.addEventListener('DOMContentLoaded', () => {
-    new Parallax({ containerId: 'parallaxContainer', smoothingFactor: 0.13, gyroEffectModifier: 10 });
+    new Parallax({ containerId: 'parallaxContainer' });
 });
 //# sourceMappingURL=parallax.js.map
