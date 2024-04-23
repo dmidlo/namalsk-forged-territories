@@ -85,11 +85,19 @@ class Parallax {
     }
     rotate(beta, gamma) {
         if (beta === null || gamma === null) {
-            return;
+            return; // Exit if any necessary values are missing.
         }
+        // Determine if the device is in portrait mode based on aspect ratio
+        const isPortrait = window.innerHeight > window.innerWidth;
+        // Adjust the inputs based on orientation:
+        // In portrait, beta affects Y (front-to-back as vertical movement) and gamma affects X (left-to-right).
+        // In landscape, gamma affects Y (left-to-right as vertical movement) and beta affects X (front-to-back).
+        const inputX = isPortrait ? gamma : beta;
+        const inputY = isPortrait ? beta : gamma;
+        // Divide by the sensitivity to normalize the inputs.
         const sensitivity = this.options.sensitivity ?? 30;
-        this.inputX = beta / sensitivity;
-        this.inputY = gamma / sensitivity;
+        this.inputX = inputX / sensitivity;
+        this.inputY = inputY / sensitivity;
     }
     handleMouseMove(event) {
         const [centerX, centerY] = this.getCenterXY();
@@ -115,10 +123,11 @@ class Parallax {
         if (event.rotationRate) {
             const { beta, gamma } = event.rotationRate;
             if (beta !== null && gamma !== null) {
-                this.inputX = beta / (this.options.sensitivity ?? 30);
-                this.inputY = gamma / (this.options.sensitivity ?? 30);
+                // Use the rotate method to adjust inputX and inputY based on the device orientation
+                this.rotate(beta, gamma);
                 const motionModifier = this.options.gyroEffectModifier ?? 10;
                 window.requestAnimationFrame(() => {
+                    // Apply transformations to layers using the modified inputs and a specific modifier for device motion
                     this.applyLayerTransformations(motionModifier, motionModifier, 'motion');
                 });
             }
