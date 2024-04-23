@@ -69,94 +69,107 @@ interface ParallaxOptions {
 }
 
 /**
- * Manages a parallax effect within a specified container by handling resizing,
- * mouse movements, and device orientation changes. This class dynamically adjusts
- * positions of parallax layers based on user interactions and sensor data to create
- * immersive visual effects.
+ * Manages a parallax effect in a specified container, dynamically adjusting layer positions based on user interactions and sensor data.
+ * This class supports dynamic resizing, mouse movement debouncing, and enhanced interactivity through device orientation handling with permission management.
+ * 
+ * @typeparam T - Restricts type to HTMLElement or its subtypes.
+ * 
+ * @property {T} baseElement - The base layer that sets the size for the parallax container.
+ * @property {T} parallaxContainer - Main container for all parallax layers.
+ * @property {NodeListOf<T>} children - Child elements in the container.
+ * @property {NodeListOf<ParallaxLayer>} layers - Parallax layers with defined depth and movement properties.
+ * @property {ResizeObserver} resizeObserver - Monitors size changes in the parallax container.
+ * @property {ParallaxOptions} options - Configuration settings for the parallax effect.
+ * @property {number | undefined} moveTimeout - Timer for debouncing mouse move events.
+ * @property {() => Promise<void>} attachDeviceOrientationListener - Public method to request device orientation permissions.
+ * 
+ * @method constructor(options: ParallaxOptions) - Initializes parallax settings, checks for valid container ID.
+ * @method private initializeLayers() - Sets up layers with depth and range from data attributes.
+ * @method private findBaseElement() - Determines the base element for dimension referencing.
+ * @method private setupResizeObserver() - Initializes a ResizeObserver for adaptive resizing.
+ * @method private updateContainerAndLayers() - Updates dimensions based on the base element or specified values.
+ * @method private debounceMouseMove(event: MouseEvent) - Throttles mouse movement handling.
+ * @method private handleMouseMove(event: MouseEvent) - Applies parallax effects based on mouse position.
+ * @method private initializeParallax() - Sets initial dimensions, binds event listeners, and starts resize observer.
+ * @method private attachEvents() - Binds event handlers for dynamic parallax interactions.
  * 
  * Features:
- * - Dynamic resizing support with a ResizeObserver.
- * - Mouse movement handling with debouncing for performance optimization.
- * - Device orientation handling with permission management for enhanced interactivity.
+ * - Supports dynamic resizing and mouse movement handling with performance optimizations.
+ * - Manages device orientation permissions for enhanced interactivity.
  * 
  * Guards and Checks:
- * - Ensures valid container ID upon initialization or throws an error.
- * - Implements debouncing for mouse movement events to reduce excessive rendering.
- * - Conditionally manages device orientation permissions to comply with privacy standards.
- * 
- * @typeparam T - Specifies that the type parameter must be an HTMLElement or a subtype thereof.
- * @property {T} baseElement - Primary layer defining the dimensions of the parallax container.
- * @property {T} parallaxContainer - Main container holding all parallax layers.
- * @property {NodeListOf<T>} children - NodeList of child elements within the container.
- * @property {NodeListOf<ParallaxLayer>} layers - NodeList of parallax layers with depth and movement range properties.
- * @property {ResizeObserver} resizeObserver - Observer for detecting size changes in the parallax container.
- * @property {ParallaxOptions} options - Configuration options for the parallax effect.
- * @property {number | undefined} moveTimeout - Timer for debouncing mouse move events.
- * 
- * @method constructor(options: ParallaxOptions) - Initializes the parallax effect with specified configuration options.
- * @method private initializeLayers() - Sets up parallax layers based on data attributes.
- * @method private findBaseElement() - Identifies the base element defining container dimensions.
- * @method private setupResizeObserver() - Attaches a ResizeObserver to the base element.
- * @method private updateContainerAndLayers() - Updates container and layer dimensions to match the base element or specified dimensions.
- * @method private debounceMouseMove(event: MouseEvent) - Throttles mouse movement handling to enhance performance.
- * @method private handleMouseMove(event: MouseEvent) - Applies parallax movement calculations to layers based on mouse position.
- * @method private initializeParallax() - Sets initial dimensions, binds event listeners, and starts the resize observer.
- * @method private attachEvents() - Binds necessary event handlers for dynamic interaction with the parallax system.
+ * - Validates container ID at initialization.
+ * - Debounces mouse movement to limit excessive rendering.
+ * - Handles device orientation permissions to comply with privacy standards.
  */
 class Parallax<T extends HTMLElement> {
-    private baseElement: T;  // The base layer that defines the size of the parallax container.
-    private parallaxContainer: T;  // The main container that holds all parallax layers.
-    private children: NodeListOf<T>;
-    private layers: NodeListOf<ParallaxLayer>;  // Collection of all parallax layer elements.
-    private resizeObserver: ResizeObserver;  // Observer to handle resizing of the viewport.
-    private options: ParallaxOptions;  // Configuration options for the parallax effect.
-    private moveTimeout: number | undefined;  // debounce timer for mousemouse events.
+    private baseElement: T;  // Defines the parallax container's dimensions.
+    private parallaxContainer: T;  // Container for all parallax layers.
+    private children: NodeListOf<T>;  // Child elements within the container, potential layers.
+    private layers: NodeListOf<ParallaxLayer>;  // Configured parallax layers.
+    private resizeObserver: ResizeObserver;  // Monitors size changes of the base element.
+    private options: ParallaxOptions;  // Configurable options for behavior and responsiveness.
+    private moveTimeout: number | undefined;  // Timer for debouncing mouse move events.
+    public attachDeviceOrientationListener: () => Promise<void>;  // Asynchronously attaches a device orientation event listener.
 
     /**
-     * Constructs a new Parallax instance with specified configuration options.
-     * Initializes the main container and layer elements, sets up the resize observer,
-     * and initializes parallax settings including mouse event listeners for the interactive parallax effect.
-     * If the specified container element is not found, an error is thrown.
-     * 
-     * @param options - The configuration options for the parallax effect, specifying the container ID and optional smoothing factor.
-     *                  The default smoothing factor is set to 0.13 if not provided.
-     * @throws {Error} Throws an error if the HTML element with the specified container ID does not exist.
+     * Creates a Parallax instance with specified configuration options. Initializes the container, layers, and observes
+     * resizing for dynamic responsiveness. Throws an error if the specified container is not found in the DOM.
+     *
+     * @param options - Configuration options for the parallax effect, including container ID and optional settings.
+     * @throws {Error} - When the specified container ID does not match any existing element.
+     *
+     * Features:
+     * - Initializes container and layers based on provided configuration.
+     * - Sets default smoothing factor if not explicitly provided.
+     * - Ensures the container's existence or throws an error.
+     * - Attaches resize and orientation events for responsive behavior.
+     *
+     * Guards and Checks:
+     * - Validates the existence of the container.
+     * - Sets a default smoothing factor to ensure consistent behavior when unspecified.
+     * - Proactively manages resize and orientation permissions to comply with device and browser capabilities.
      */
     constructor(options: ParallaxOptions) {
-        this.options = { ...options, smoothingFactor: 0.13 }; // Set default smoothing factor if not provided.
-        this.parallaxContainer = document.getElementById(options.containerId) as T;  // Get the container by ID.
+        this.options = { ...options, smoothingFactor: 0.13 }; // Set default smoothing factor if not specified.
+        this.parallaxContainer = document.getElementById(options.containerId) as T; // Obtain container by ID.
 
-        // If the container is not found, throw an error.
         if (!this.parallaxContainer) {
             throw new Error(`Element with ID '${options.containerId}' not found.`);
         }
 
-        this.children = this.parallaxContainer.querySelectorAll<T>('[data-depth]');  // Get all layers with 'data-depth' attribute.
-        this.layers = this.initializeLayers();  // Initialize and store the layer elements with depth and maxRange
-        
-        this.baseElement = this.findBaseElement();  // Find the base layer to determine container dimensions.
-        this.resizeObserver = new ResizeObserver(() => this.updateContainerAndLayers());  // Setup resize observer.
+        this.children = this.parallaxContainer.querySelectorAll<T>('[data-depth]'); // Retrieve layers with 'data-depth'.
+        this.layers = this.initializeLayers(); // Initialize and configure layer elements.
 
-        this.initializeParallax();  // Initialize parallax settings and event listeners.
+        this.baseElement = this.findBaseElement(); // Identify the base element to set container dimensions.
+        this.resizeObserver = new ResizeObserver(() => this.updateContainerAndLayers()); // Set up resize observer for dynamic resizing.
 
-        this.moveTimeout = undefined;
+        this.initializeParallax(); // Set up parallax settings and event listeners.
+        this.attachDeviceOrientationListener = this._attachDeviceOrientationListener.bind(this); // Bind device orientation listener for permissions handling.
+
+        this.moveTimeout = undefined; // Prepare for debouncing mouse move events.
     }
 
     /**
-     * Initializes and configures the parallax layers based on data attributes.
-     * This method extracts the 'data-depth' and 'data-max-range' attributes from each child element,
-     * converts them to numeric values, and assigns these values to each corresponding layer.
-     * It ensures that every layer is configured with essential properties for depth-based movement calculations.
-     * If attributes are missing, defaults (0 for both depth and maxRange) are used.
+     * Initializes parallax layers by extracting and setting depth and maxRange from data attributes.
+     * Ensures that each layer in the parallax system is configured with essential properties for depth-based movement.
      *
-     * @returns {NodeListOf<ParallaxLayer>} A NodeList of parallax layer elements, each enriched with 'depth' and 'maxRange' properties.
+     * Features:
+     * - Extracts `data-depth` and `data-max-range` attributes and converts them to numeric values.
+     * - Ensures all parallax layers have necessary properties for movement calculations.
+     *
+     * Guards and Checks:
+     * - Provides default values for `depth` and `maxRange` if data attributes are missing, ensuring layers are always functional.
+     *
+     * @returns {NodeListOf<ParallaxLayer>} Configured NodeList of parallax layers.
      */
     private initializeLayers(): NodeListOf<ParallaxLayer> {
+        // Map through children to assign depth and maxRange properties based on data attributes.
         const layers = Array.from(this.children).map(layer => {
-            const depth = parseFloat(layer.getAttribute('data-depth') ?? '0');  // Extract depth, default to 0 if missing.
-            const maxRange = parseFloat(layer.getAttribute('data-max-range') ?? '0');  // Extract max range, default to 0 if missing.
-            Object.assign(layer, {depth, maxRange});  // Assign extracted values to the layer.
-            return layer as unknown as ParallaxLayer;  // Cast back to ParallaxLayer to treat as such.
+            const depth = parseFloat(layer.getAttribute('data-depth') ?? '0');  // Default depth is 0 if attribute is absent.
+            const maxRange = parseFloat(layer.getAttribute('data-max-range') ?? '0');  // Default maxRange is 0 if attribute is absent.
+            Object.assign(layer, { depth, maxRange });  // Update layer with parsed properties.
+            return layer as unknown as ParallaxLayer;  // Cast back to ParallaxLayer type.
         });
 
         return layers as unknown as NodeListOf<ParallaxLayer>;  // Return NodeList of configured layers.
@@ -164,18 +177,22 @@ class Parallax<T extends HTMLElement> {
 
     /**
      * Identifies and returns the base element within the parallax container. This element defines the reference
-     * dimensions for the parallax effect. The method checks for an element marked with `data-is-base-dimensions`.
-     * If no such element is found, it defaults to the first child of the container. If the container has no children,
-     * a new div is created and returned as the base element.
+     * dimensions for the parallax effect. If no specific base element is found, it defaults to the first child or
+     * creates a fallback div if the container is empty.
      * 
-     * This method includes error handling for cases where no suitable base element is found, logging appropriate
-     * errors and creating a fallback element if necessary to ensure the parallax system can still function.
-     *
-     * @returns {T} The base element of the parallax scene, which sets the scene's dimensions and initial positions.
-     * @throws {Error} If no base element is found and no children are present in the container, an error is logged and a fallback div is created and returned.
+     * Features:
+     * - Searches for a specified base element marked with `data-is-base-dimensions`.
+     * - Defaults to the first child if the specified base is not found.
+     * - Creates a new div as a fallback if no children are present, ensuring the system remains functional.
+     * 
+     * Guards and Checks:
+     * - Logs errors and warnings to assist debugging if the base element is not found or if there are no children in the container.
+     * 
+     * @returns {T} The base element of the parallax scene, crucial for setting initial dimensions and positions.
      */
     private findBaseElement(): T {
         const base = this.parallaxContainer.querySelector<T>('[data-is-base-dimensions]');
+        
         if (!base) {
             console.error("Base element with `data-is-base-dimensions` not found. Defaulting to first child.");
             if (this.parallaxContainer.children.length > 0) {
@@ -192,178 +209,192 @@ class Parallax<T extends HTMLElement> {
     }
 
     /**
-     * Sets up a ResizeObserver on the base element to monitor changes in its dimensions.
-     * This is crucial for adapting the parallax container and layers to the viewport's changes.
-     * Observing the base element helps maintain the alignment and scaling of the parallax effect
-     * relative to the container's dimensions, ensuring visual consistency across different window sizes.
+     * Sets up a ResizeObserver to dynamically adapt the parallax container and layers to size changes of the base element.
+     * The observer triggers updates to maintain alignment and scaling with the viewport, ensuring the parallax effect remains consistent across different screen sizes.
+     * 
+     * Features:
+     * - Continuous monitoring of base element dimensions to adjust parallax container and layer sizes.
+     * 
+     * Guards and Checks:
+     * - None explicitly needed as this function relies on the ResizeObserver API, which handles element observation and callback invocation natively.
      */
     private setupResizeObserver(): void {
-        // Start observing the base element for changes in size to dynamically adjust the parallax scene.
+        // Observe size changes in the base element to update the parallax dimensions responsively.
         this.resizeObserver.observe(this.baseElement);
     }
 
     /**
-     * Updates the dimensions of the parallax container to match the current base element's dimensions.
-     * This synchronization ensures that the container size accurately reflects the base element's size,
-     * maintaining consistent parallax effects across various viewport sizes. The method accepts optional
-     * parameters for width and height that default to the base element's current dimensions, allowing for
-     * flexibility in dynamically resizing the container.
+     * Updates the dimensions of the parallax container to match those of the base element or specified dimensions.
+     * This ensures that the container size adapts to changes in the base element, maintaining a consistent parallax effect.
+     * It's essential for the responsiveness of the parallax scene across different viewport sizes.
      * 
-     * @param baseWidth - Optional width for the parallax container, defaults to the current width of the base element.
-     * @param baseHeight - Optional height for the parallax container, defaults to the current height of the base element.
+     * Features:
+     * - Dynamically adjusts the container's width and height to match the base element or provided dimensions.
+     * - Directly modifies CSS properties to reflect new dimensions, ensuring immediate visual update.
+     * 
+     * Guards and Checks:
+     * - Utilizes default parameters to use current dimensions of the base element if no explicit dimensions are provided.
+     * - Operates under the assumption that the base element's dimensions are accurate and meaningful for the container's size.
+     * 
+     * @param baseWidth - Optional width to set for the parallax container, defaults to the base element's current width.
+     * @param baseHeight - Optional height to set for the parallax container, defaults to the base element's current height.
      */
     private updateContainerAndLayers(baseWidth: number = this.baseElement.offsetWidth, baseHeight: number = this.baseElement.offsetHeight): void {
-        this.parallaxContainer.style.width = `${baseWidth}px`;  // Set the container's width to either the specified or base element's width.
-        this.parallaxContainer.style.height = `${baseHeight}px`;  // Set the container's height to either the specified or base element's height.
+        // Apply the specified or current base element dimensions to the container's CSS properties.
+        this.parallaxContainer.style.width = `${baseWidth}px`;
+        this.parallaxContainer.style.height = `${baseHeight}px`;
     }
 
     /**
-     * Debounces mouse movement events to enhance performance and responsiveness.
-     * This method limits the frequency of execution for `handleMouseMove` to prevent excessive calculations
-     * and re-renderings during rapid or frequent mouse movements. A timeout is used to delay the processing of
-     * mouse movements until a short period of inactivity (6 milliseconds) has occurred, thus reducing the load
-     * on the browser's rendering thread and improving the overall responsiveness of the parallax effect.
+     * Debounces mouse move events to optimize responsiveness and performance.
+     * This method limits the frequency of parallax calculations during rapid or frequent mouse movements by introducing a short delay.
      * 
-     * @param event - The MouseEvent object containing details about the current mouse position and movement.
+     * Features:
+     * - Reduces the load on the rendering process by debouncing high-frequency events.
+     * 
+     * Guards and Checks:
+     * - Clears any previous timeout to ensure that the latest event is the one processed, avoiding redundant calculations.
+     * 
+     * @param event - The MouseEvent object from the mouse movement.
      */
     private debounceMouseMove(event: MouseEvent): void {
-        // Clear any existing timeout to reset the debounce timer
+        // Reset the debounce timer to ensure only the latest event is processed
         clearTimeout(this.moveTimeout);
 
-        // Set a new timeout to delay the handling of the mouse move event
+        // Delay the mouse move handling to limit the frequency of updates
         this.moveTimeout = setTimeout(() => {
-            // Call the primary mouse move handler after the debounce delay
             this.handleMouseMove(event);
-        }, 6); // 6 milliseconds delay for the debounce, providing a balance between responsiveness and performance
+        }, 6); // Delay set to 6 milliseconds for a balance between performance and responsiveness
     }
 
     /**
-     * Calculates and returns the central coordinates of the parallax container. This method is crucial for determining the
-     * reference point from which layer movements are calculated during mouse interactions.
+     * Calculates and returns the central coordinates of the parallax container.
+     * This method provides a consistent reference point for calculating layer movements during mouse interactions.
      *
-     * Features:
-     * - Provides a consistent reference for central coordinates, enhancing the accuracy of parallax effect calculations.
-     *
-     * Guards and Checks:
-     * - None required, as it operates purely based on the dimensions of `parallaxContainer` which are expected to be valid and positive.
-     *
-     * @returns {[number, number]} A tuple representing the x and y coordinates of the container's center.
+     * @returns {[number, number]} A tuple of x and y coordinates representing the center of the container.
+     * 
+     * @remarks
+     * This method assumes a rectangular container where the reference for center calculation is straightforward.
+     * No guards or checks are needed as it purely relies on the container's current dimensions, which are expected
+     * to be valid and positive.
      */
     private getCenterXY(): [number, number] {
-        // Compute the vertical center by dividing the container's offset height by two.
+        // Calculate the vertical center of the container.
         const centerY = this.parallaxContainer.offsetHeight / 2;
-
-        // Compute the horizontal center, assuming a symmetrical container (width equals height).
+        // Calculate the horizontal center of the container.
         const centerX = this.parallaxContainer.offsetWidth / 2;
-
-        // Return the center coordinates as a tuple.
+        // Return the calculated center coordinates.
         return [centerX, centerY];
     }
 
-
     /**
-     * Handles mouse movement events within the parallax container to adjust layer positions dynamically.
-     * This method calculates the relative mouse coordinates with respect to the container's center.
-     * It then determines and applies the parallax effect to each layer based on their respective depth
-     * and movement range constraints. The motion is smoothed by a factor defined in the options.
+     * Handles mouse movement events to dynamically adjust the positions of parallax layers.
+     * This method calculates the mouse position relative to the center of the parallax container and applies transformations to each layer based on their depth and configured maximum range.
+     * 
+     * Features:
+     * - Adjusts layer positions dynamically based on mouse interaction to create an interactive parallax effect.
+     * - Utilizes smoothing factors to moderate the movement speed of the layers, enhancing the visual fluidity.
+     * 
+     * Guards and Checks:
+     * - Ensures that movements are constrained within each layer's configured maximum allowable range to prevent unrealistic displacements.
+     * - Uses a fail-safe check (`!`) on the optional `smoothingFactor` to handle scenarios where it might not be provided, ensuring a default behavior.
      * 
      * @param event - The MouseEvent object containing details about the cursor's current position.
      */
     private handleMouseMove(event: MouseEvent): void {
-        // Calculate the center coordinates of the parallax container.
+        // Determine the center of the parallax container.
         const [centerX, centerY] = this.getCenterXY();
 
-        // Determine the mouse's position relative to the parallax container.
-        const mouseX = event.clientX - this.parallaxContainer.getBoundingClientRect().left;  // Mouse X relative to container.
-        const mouseY = event.clientY - this.parallaxContainer.getBoundingClientRect().top;  // Mouse Y relative to container.
+        // Calculate the mouse's relative position within the parallax container.
+        const mouseX = event.clientX - this.parallaxContainer.getBoundingClientRect().left;
+        const mouseY = event.clientY - this.parallaxContainer.getBoundingClientRect().top;
 
-        // Adjust each layer based on its specified depth and maximum movement range.
+        // Iterate over each layer to compute and apply the parallax transformation.
         this.layers.forEach(layer => {
-            // Calculate the potential displacement based on the cursor's deviation from the center.
+            // Compute the displacement influenced by depth and the smoothing factor.
             let deltaX = (mouseX - centerX) * layer.depth * this.options.smoothingFactor!;
             let deltaY = (mouseY - centerY) * layer.depth * this.options.smoothingFactor!;
 
-            // Constrain the movement to the layer's maximum allowable range.
+            // Restrict the displacement to within the predefined maximum range.
             const boundX = Math.min(Math.max(deltaX, -layer.maxRange), layer.maxRange);
             const boundY = Math.min(Math.max(deltaY, -layer.maxRange), layer.maxRange);
 
-            // Apply the calculated transformation to the layer.
+            // Apply the constrained transformation to the layer.
             layer.style.transform = `translate(${boundX}px, ${boundY}px)`;
         });
     }
 
     /**
-     * Handles device orientation events to adjust the position of parallax layers based on the device's tilt.
-     * This method responds to the orientation of the device in real-time, calculating horizontal and vertical
-     * movements from the 'beta' (front-to-back tilt) and 'gamma' (left-to-right tilt) values. These movements
-     * are modified by the gyroEffectModifier and smoothingFactor settings to tune the responsiveness and amplitude
-     * of layer movements. Each layer's movement is also constrained within its defined maximum range to prevent
-     * excessive displacement. The method includes checks for null orientation values to ensure reliable execution.
+     * Handles device orientation events to dynamically adjust the position of parallax layers based on device tilt.
+     * This method computes movements from the 'beta' and 'gamma' orientation values and applies them, modified by
+     * user-defined settings for gyroscopic effect and smoothing. It ensures movements are within each layer's defined range.
      * 
-     * @param event - The DeviceOrientationEvent providing the orientation data.
+     * Features:
+     * - Real-time device orientation handling to create dynamic parallax effects.
+     * - Uses 'beta' (front-to-back tilt) and 'gamma' (left-to-right tilt) to calculate directional movement.
+     * - Applies a gyro effect modifier and a smoothing factor to enhance the natural feel of motion.
+     * 
+     * Guards and Checks:
+     * - Exits early if essential orientation data (beta, gamma) is missing, ensuring robust execution.
+     * - Constrains calculated movements within each layer's maximum allowable range to maintain visual coherence.
+     * 
+     * @param event - The DeviceOrientationEvent containing orientation data.
      */
     private handleDeviceOrientation(event: DeviceOrientationEvent): void {
         const { beta, gamma } = event;
         if (beta === null || gamma === null) {
-            return; // Exit if essential data is missing.
+            return; // Exit if essential orientation data is missing.
         }
 
-        // Calculate movement assuming the phone is in normal portrait orientation.
-        let movementX = gamma; // Tilt left-to-right affects horizontal movement.
-        let movementY = beta;  // Tilt front-to-back affects vertical movement.
+        // Calculate movement based on device tilt, assuming normal portrait orientation.
+        let movementX = gamma * (this.options.gyroEffectModifier || 10) * (this.options.smoothingFactor || 0.13);
+        let movementY = beta * (this.options.gyroEffectModifier || 10) * (this.options.smoothingFactor || 0.13);
 
-        // Apply the gyro effect modifier and a smoothing factor for each movement.
-        const gyroEffect = this.options.gyroEffectModifier || 10;
-        const smoothing = this.options.smoothingFactor || 0.13;
-        movementX *= gyroEffect * smoothing;
-        movementY *= gyroEffect * smoothing;
-
-        // Update each layer's position based on calculated movements and depth.
+        // Apply calculated movements to each layer, adjusted for depth and constrained within maximum range.
         this.layers.forEach(layer => {
-            const deltaX = movementX * layer.depth;
-            const deltaY = movementY * layer.depth;
-            const boundX = Math.min(Math.max(deltaX, -layer.maxRange), layer.maxRange);
-            const boundY = Math.min(Math.max(deltaY, -layer.maxRange), layer.maxRange);
-            layer.style.transform = `translate(${boundX}px, ${boundY}px)`;
+            const deltaX = Math.min(Math.max(movementX * layer.depth, -layer.maxRange), layer.maxRange);
+            const deltaY = Math.min(Math.max(movementY * layer.depth, -layer.maxRange), layer.maxRange);
+            layer.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
         });
     }
 
     /**
-     * Initializes the foundational aspects of the parallax system. This includes setting the initial
-     * dimensions and positions of the layers, attaching event listeners for interactive parallax effects,
-     * and initiating a resize observer to adapt to viewport changes. This method ensures the parallax
-     * system is responsive and ready for user interactions immediately after setup.
+     * Initializes parallax functionality with necessary configurations.
+     * Sets the initial dimensions and positions based on the base element, binds interactive event listeners,
+     * and starts observing size changes for dynamic responsiveness. This method orchestrates the foundational setup
+     * ensuring the parallax system is fully operational immediately after instantiation.
      * 
-     * - Ensures the container and layers match the initial dimensions of the base element.
-     * - Binds mouse and device orientation event handlers to enable dynamic interactions.
-     * - Sets up a resize observer to maintain alignment and scaling relative to the viewport, providing a
-     *   responsive experience across different device sizes.
+     * Features:
+     * - Sets up initial dimensions and alignment of the parallax container to match the base element.
+     * - Attaches dynamic interaction handlers for mouse and device orientation events.
+     * - Establishes a resize observer to adapt the display to viewport changes.
+     * 
+     * Guards and Checks:
+     * - Ensures that event listeners are attached only after the base element’s dimensions are set.
+     * - Uses resizing observation to maintain visual consistency across varying viewport sizes.
      */
     private initializeParallax(): void {
-        this.updateContainerAndLayers();  // Initialize dimensions and positions based on the base element.
-        this.attachEvents();  // Bind event listeners for mouse and device orientation movements.
-        this.setupResizeObserver();  // Begin observing size changes for responsive adjustments.
+        this.updateContainerAndLayers();  // Set initial container and layer dimensions.
+        this.attachEvents();  // Bind event handlers for interactive parallax effects.
+        this.setupResizeObserver();  // Start observing for changes in container size.
     }
 
     /**
-     * Asynchronously attaches a device orientation event listener to enhance parallax effects based on device tilts.
-     * This method dynamically handles permission requests for device orientation events on platforms that require it (like iOS).
-     * It utilizes a two-stage approach: first, it checks if permission needs to be requested and handles that by setting up
-     * a temporary event listener that triggers the permission request on user interaction. If the permission is granted, or if
-     * the device supports orientation events without permissions, the orientation listener is added. Otherwise, it logs an error.
-     * This setup ensures compliance with privacy standards and enhances user interaction by integrating device motion into the parallax effect.
+     * Asynchronously attaches a device orientation event listener, handling permissions dynamically.
+     * This method checks for the necessity of permissions and attaches the event listener accordingly.
+     * It ensures compliance with privacy regulations and enhances the interactive parallax effect by
+     * integrating real-time device movements.
      *
      * Features:
-     * - Checks and requests permission for device orientation where required.
-     * - Dynamically attaches device orientation event listeners upon user consent.
-     * - Enhances the parallax effect with real-time device orientation data.
-     * - Guards against multiple permission requests and handles possible exceptions.
-     * 
-     * @remarks
-     * - This method should be called after the DOM is fully loaded to ensure all elements are accessible.
-     * - Proper error handling and user feedback mechanisms are crucial for a good user experience in environments requiring permissions.
+     * - Dynamically handles permission requests for device orientation.
+     * - Enhances parallax effects with device orientation data.
+     *
+     * Guards and Checks:
+     * - Prevents multiple permission requests by removing event listeners after the initial user gesture.
+     * - Handles possible exceptions during the permission request process.
+     * - Logs an error if device orientation is unsupported.
      */
-    private async attachDeviceOrientationListener() {
+    private async _attachDeviceOrientationListener() {
         // Function to add the device orientation event listener.
         const addOrientationListener = () => {
             window.addEventListener('deviceorientation', this.handleDeviceOrientation.bind(this));
@@ -403,36 +434,44 @@ class Parallax<T extends HTMLElement> {
     }
 
     /**
-     * Attaches necessary event listeners to facilitate dynamic parallax interactions. 
-     * It listens for mouse movements to adjust the parallax effect dynamically and handles window resizing to ensure 
-     * the parallax display is correctly scaled to the current viewport. It also initiates the attachment process 
-     * for device orientation events, supporting responsive parallax effects based on device movements.
+     * Attaches event listeners for mouse movement, device orientation changes, and window resizing.
+     * This setup enhances the interactivity and responsiveness of the parallax effect by dynamically adjusting layer positions
+     * based on user inputs and browser window changes. 
      * 
      * Features:
-     * - Debounces mouse move events to limit the frequency of recalculations for performance optimization.
-     * - Dynamically updates the parallax layer dimensions on window resize with a minimal delay to prevent excessive recalculations.
-     * - Checks and requests permission for device orientation events where necessary, enhancing interactivity on supported devices.
+     * - Debounced mouse movement handling to optimize performance by reducing the frequency of recalculations.
+     * - Conditional device orientation listener attachment based on the presence of a specific HTML attribute, 
+     *   ensuring flexibility and user control in triggering permissions requests.
+     * - Responsive resizing to maintain parallax effect integrity across varying viewport sizes.
      * 
      * Guards and Checks:
-     * - Ensures that mouse move event recalculations are debounced, thus preventing excessive function calls during rapid movement.
-     * - Implements a safety check using `clearTimeout` before setting a new resize timeout to ensure that only the latest call is processed.
-     * - Conditionally handles device orientation permissions and capabilities based on browser and device support, providing fallbacks or errors as appropriate.
+     * - Uses `clearTimeout` to prevent multiple resizing triggers from stacking, ensuring only the most recent action is processed.
+     * - Conditionally manages device orientation permissions to comply with platform-specific privacy requirements.
+     * - Provides fallbacks by adding default event listeners if no specific user gesture initiator is present.
+     * 
+     * @remarks
+     * The class also includes a public interface allowing developers to trigger device orientation permission requests 
+     * interactively, enhancing user experience on devices that require explicit permissions for accessing motion sensors.
      */
     private attachEvents(): void {
-        // Listen to mouse movement across the document, applying a debounced handler to reduce performance impact.
+        // Debounce mouse movements to optimize performance.
         document.addEventListener('mousemove', this.debounceMouseMove.bind(this));
 
-        // Initialize listening for device orientation changes, requesting permissions if necessary.
-        this.attachDeviceOrientationListener();
+        // Attach device orientation listener, either on a user gesture or immediately based on browser policy.
+        const gyroListenerTrigger = this.parallaxContainer.querySelector<HTMLElement>('[data-gyroscope-listener]');
+        if (gyroListenerTrigger) {
+            gyroListenerTrigger.addEventListener('click', () => this._attachDeviceOrientationListener());
+        } else {
+            this._attachDeviceOrientationListener(); // Fallback to attaching without user gesture if no specific element found.
+        }
 
-        // Handle window resizing with a debounce mechanism to update parallax dimensions responsively yet efficiently.
+        // Debounce window resize events to ensure parallax dimensions are updated efficiently after viewport changes.
         let resizeTimer: number;
-        const resizeDelayMS: number = 6;
+        const resizeDelayMS: number = 6; // Minimal delay to balance responsiveness and performance.
         window.addEventListener('resize', () => {
-            clearTimeout(resizeTimer);  // Clear any previous timer to ensure only the last resize event within the delay period triggers the update.
+            clearTimeout(resizeTimer);  // Clear previous timer to ensure only the last resize event is processed.
             resizeTimer = setTimeout(() => {
-                // Update the container and layer dimensions based on the new viewport size after a brief delay.
-                this.updateContainerAndLayers(window.innerWidth);
+                this.updateContainerAndLayers(window.innerWidth); // Update dimensions based on new viewport size.
             }, resizeDelayMS);
         });
     }
