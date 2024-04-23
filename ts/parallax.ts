@@ -247,12 +247,12 @@ class Parallax<T extends HTMLElement> {
         let modifierY = inputModifierY;
         if (eventOrigin === 'gyro') {
             // Gyro inputs can be more sensitive, so reduce the effect
-            modifierX *= 0.1;
-            modifierY *= 0.1;
-        } else if (eventOrigin === 'motion') {
-            // Device motion inputs often have larger range and variability
             modifierX *= 0.05;
             modifierY *= 0.05;
+        } else if (eventOrigin === 'motion') {
+            // Device motion inputs often have larger range and variability
+            modifierX *= 0.025;
+            modifierY *= 0.025;
         } // No additional scaling for mouse as it is already fairly direct
 
         this.layers.forEach(layer => {
