@@ -29,6 +29,7 @@ interface ParallaxOptions {
     sensitivity?: number;
     mouseDebounce?: number;
     windowResizeDebounce?: number;
+    deviceDebounce?: number;
 }
 
 class Parallax<T extends HTMLElement> {
@@ -48,6 +49,7 @@ class Parallax<T extends HTMLElement> {
             gyroEffectModifier: 10, // Default gyro effect modifier for device orientation sensitivity.
             mouseDebounce: 6, // Milliseconds delay before re-polling mouse coordinates.
             windowResizeDebounce: 6, // Milliseconds delay before re-polling window dimensions during resize events.
+            deviceDebounce: 6, // Milliseconds delay before re-polling device motion and event metrics.
         };
 
         // Calculate default sensitivity if not provided, adjusting for device and display characteristics.
@@ -274,11 +276,26 @@ class Parallax<T extends HTMLElement> {
         const debouncedMouseMove = this.debounce(this.handleMouseMove.bind(this), this.options.mouseDebounce!);
         this.parallaxContainer.addEventListener('mousemove', debouncedMouseMove);
     
+        // Debounced orientation and motion listener attachment
+        const debouncedDeviceListener = this.debounce(this._attachDeviceOrientationAndMotionListener.bind(this), this.options.deviceDebounce!);
+    
+        // Check if there is an element with the 'data-attach-gyro-listener' attribute
+        const gyroListenerElement = document.querySelector('[data-attach-gyro-listener]');
+    
+        if (gyroListenerElement) {
+            // If found, add click event handler to this specific element
+            gyroListenerElement.addEventListener('click', debouncedDeviceListener);
+        } else {
+            // If not found, add click and touchend event handlers to the document
+            document.addEventListener('click', debouncedDeviceListener);
+            document.addEventListener('touchend', debouncedDeviceListener);
+        }
+    
         window.addEventListener('resize', this.debounce(() => {
             // Update dimensions upon resizing
             this.updateContainerAndLayersOnWindowResize(window.innerWidth, window.innerHeight);
         }, this.options.windowResizeDebounce!));
-    }
+    }    
 }
 
 document.addEventListener('DOMContentLoaded', () => {
