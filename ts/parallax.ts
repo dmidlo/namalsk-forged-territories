@@ -1,6 +1,8 @@
 interface ParallaxLayer extends HTMLElement {
     depth: number;
     maxRange: number;
+    calibrateX?: boolean;
+    calibrateY?: boolean;
 }
 
 interface DeviceOrientationEventPermissions {
@@ -41,6 +43,15 @@ class Parallax<T extends HTMLElement> {
     private options: ParallaxOptions;  // Configurable options for behavior and responsiveness.
     private inputX: number = 0; // Default initialization to 0 to ensure value is always defined.
     private inputY: number = 0; // Default initialization to 0 to ensure value is always defined.
+    private calibrationThreshold: number = 100;
+    private calibrationDelay: number = 500;
+    private supportDelay: number = 500;
+    private calibrateX: boolean = false;
+    private calibrateY: boolean = true;
+    private calibrationTimer?: number;
+    private calibrationFlag: boolean = true;
+    private calibrationX: number = 0;
+    private calibrationY: number = 0;
     public attachDeviceOrientationListener: () => Promise<void>;  // Asynchronously attaches a device orientation event listener.
 
     constructor(options: ParallaxOptions) {
@@ -80,15 +91,17 @@ class Parallax<T extends HTMLElement> {
     }
 
     private initializeLayers(): NodeListOf<ParallaxLayer> {
-        // Map through children to assign depth and maxRange properties based on data attributes.
+        // Map through children to assign depth, maxRange, and calibration properties based on data attributes.
         const layers = Array.from(this.children).map(layer => {
-            const depth = parseFloat(layer.getAttribute('data-depth') ?? '0');  // Default depth is 0 if attribute is absent.
-            const maxRange = parseFloat(layer.getAttribute('data-max-range') ?? '0');  // Default maxRange is 0 if attribute is absent.
-            Object.assign(layer, { depth, maxRange });  // Update layer with parsed properties.
-            return layer as unknown as ParallaxLayer;  // Cast back to ParallaxLayer type.
+            const depth = parseFloat(layer.getAttribute('data-depth') ?? '0');
+            const maxRange = parseFloat(layer.getAttribute('data-max-range') ?? '0');
+            const calibrateX = layer.hasAttribute('data-calibrate-x') ? layer.getAttribute('data-calibrate-x') === 'true' : this.calibrateX;
+            const calibrateY = layer.hasAttribute('data-calibrate-y') ? layer.getAttribute('data-calibrate-y') === 'true' : this.calibrateY;
+            Object.assign(layer, { depth, maxRange, calibrateX, calibrateY });
+            return layer as unknown as ParallaxLayer;
         });
 
-        return layers as unknown as NodeListOf<ParallaxLayer>;  // Return NodeList of configured layers.
+        return layers as unknown as NodeListOf<ParallaxLayer>;
     }
 
     private findBaseElement(): T {
@@ -118,7 +131,6 @@ class Parallax<T extends HTMLElement> {
         this.parallaxContainer.style.width = `${baseWidth}px`;
         this.parallaxContainer.style.height = `${baseHeight}px`;
     }
-    
 
     private getCenterXY(): [number, number] {
         // Return center of the base element, not the entire container to avoid using inflated values
@@ -132,21 +144,50 @@ class Parallax<T extends HTMLElement> {
         return aspectRatio * 10;  // Multiply aspect ratio by 10 to derive a basic sensitivity level.
     }
 
+    private onCalibrationTimer(): void {
+        // Resets the calibration flag to trigger new calibration on the next appropriate event
+        this.calibrationFlag = true;
+    }
+
+    private queueCalibration(delay: number): void {
+        // Debounce calibration attempts
+        clearTimeout(this.calibrationTimer);
+        this.calibrationTimer = window.setTimeout(() => this.onCalibrationTimer(), delay);
+    }
+
+    // private calibrate(x?: boolean, y?: boolean): void {
+    //     // Optionally set calibration axis
+    //     this.calibrateX = x !== undefined ? x : this.calibrateX;
+    //     this.calibrateY = y !== undefined ? y : this.calibrateY;
+    // }
+
+    private applyCalibration(inputX: number, inputY: number): [number, number] {
+        // Apply calibration to input values. If the difference between input and calibration exceeds the threshold, adjust the input by subtracting the calibration offset.
+        if (Math.abs(inputX - this.calibrationX) > this.calibrationThreshold) {
+            inputX -= this.calibrationX;
+        }
+        if (Math.abs(inputY - this.calibrationY) > this.calibrationThreshold) {
+            inputY -= this.calibrationY;
+        }
+        return [inputX, inputY];
+    }
+
     private rotate(beta: number | null, gamma: number | null): void {
         if (beta === null || gamma === null) {
-            return; // Exit if any necessary values are missing.
+            return;
         }
 
-        // Determine if the device is in portrait mode based on aspect ratio
         const isPortrait = window.innerHeight > window.innerWidth;
+        let inputX = isPortrait ? gamma : beta;
+        let inputY = isPortrait ? beta : gamma;
 
-        // Adjust the inputs based on orientation:
-        // In portrait, beta affects Y (front-to-back as vertical movement) and gamma affects X (left-to-right).
-        // In landscape, gamma affects Y (left-to-right as vertical movement) and beta affects X (front-to-back).
-        const inputX = isPortrait ? gamma : beta;
-        const inputY = isPortrait ? beta : gamma;
+        if (this.calibrationFlag) {
+            this.calibrationFlag = false;
+            this.calibrationX = inputX;
+            this.calibrationY = inputY;
+        }
 
-        // Divide by the sensitivity to normalize the inputs.
+        [inputX, inputY] = this.applyCalibration(inputX, inputY);
         const sensitivity = this.options.sensitivity ?? 30;
         this.inputX = inputX / sensitivity;
         this.inputY = inputY / sensitivity;
@@ -173,7 +214,9 @@ class Parallax<T extends HTMLElement> {
             const gyroModifier = this.options.gyroEffectModifier ?? 10;
     
             window.requestAnimationFrame(() => {
-                this.applyLayerTransformations(gyroModifier, gyroModifier, 'gyro');
+                let [calibratedX, calibratedY] = this.applyCalibration(this.inputX, this.inputY);
+                // Applying layer transformations using calibrated values
+                this.applyLayerTransformations(calibratedX * gyroModifier, calibratedY * gyroModifier, 'gyro');
             });
         }
     }
@@ -197,38 +240,37 @@ class Parallax<T extends HTMLElement> {
     }
 
     private applyLayerTransformations(inputModifierX: number, inputModifierY: number, eventOrigin: 'mouse' | 'gyro' | 'motion'): void {
-    const [centerX, centerY] = this.getCenterXY();
+        const [centerX, centerY] = this.getCenterXY();
 
-    // Adjust input modifiers based on the event source to control responsiveness and effects
-    let modifierX = inputModifierX;
-    let modifierY = inputModifierY;
-    if (eventOrigin === 'gyro') {
-        // Gyro inputs can be more sensitive, so reduce the effect
-        modifierX *= 0.1;
-        modifierY *= 0.1;
-    } else if (eventOrigin === 'motion') {
-        // Device motion inputs often have larger range and variability
-        modifierX *= 0.05;
-        modifierY *= 0.05;
-    } // No additional scaling for mouse as it is already fairly direct
+        // Adjust input modifiers based on the event source to control responsiveness and effects
+        let modifierX = inputModifierX;
+        let modifierY = inputModifierY;
+        if (eventOrigin === 'gyro') {
+            // Gyro inputs can be more sensitive, so reduce the effect
+            modifierX *= 0.1;
+            modifierY *= 0.1;
+        } else if (eventOrigin === 'motion') {
+            // Device motion inputs often have larger range and variability
+            modifierX *= 0.05;
+            modifierY *= 0.05;
+        } // No additional scaling for mouse as it is already fairly direct
 
-    this.layers.forEach(layer => {
-        const { depth, maxRange } = layer;
-        // Calculate the allowed movement range while considering the modified sensitivity
-        const deltaX = Math.min(Math.max(-maxRange, this.inputX * depth * modifierX * centerX), maxRange);
-        const deltaY = Math.min(Math.max(-maxRange, this.inputY * depth * modifierY * centerY), maxRange);
+        this.layers.forEach(layer => {
+            const { depth, maxRange } = layer;
+            // Calculate the allowed movement range while considering the modified sensitivity
+            const deltaX = Math.min(Math.max(-maxRange, this.inputX * depth * modifierX * centerX), maxRange);
+            const deltaY = Math.min(Math.max(-maxRange, this.inputY * depth * modifierY * centerY), maxRange);
 
-        // Apply the transform with calculated offsets and ensure movements are within the maximum range
-        layer.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
-    });
-}
-
-
+            // Apply the transform with calculated offsets and ensure movements are within the maximum range
+            layer.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+        });
+    }
 
     private initializeParallax(): void {
-        this.updateContainerAndLayersOnWindowResize();  // Set initial container and layer dimensions.
-        this.attachEvents();  // Bind event handlers for interactive parallax effects.
-        this.setupResizeObserver();  // Start observing for changes in container size.
+        this.updateContainerAndLayersOnWindowResize();  // Set initial dimensions and setup event listeners.
+        this.attachEvents();
+        this.setupResizeObserver();
+        this.queueCalibration(this.calibrationDelay);  // Start calibration process initially.
     }
 
     private async _attachDeviceOrientationAndMotionListener() {
@@ -242,14 +284,15 @@ class Parallax<T extends HTMLElement> {
             document.removeEventListener('click', this._attachDeviceOrientationAndMotionListener);
             document.removeEventListener('touchend', this._attachDeviceOrientationAndMotionListener);
         };
-    
+
         if (typeof DeviceOrientationEvent !== 'undefined' && 'requestPermission' in DeviceOrientationEvent) {
             removeGestureListeners(); // Assume permission needs to be requested once per session
-    
+
             try {
                 const permission = await (DeviceOrientationEvent as unknown as DeviceOrientationEventPermissions).requestPermission();
                 if (permission === 'granted') {
-                    addOrientationAndMotionListeners();
+                    // Use support delay to debounce the addition of orientation and motion listeners
+                    setTimeout(addOrientationAndMotionListeners, this.supportDelay);
                 } else {
                     console.error('Permission for device orientation was denied.');
                 }
@@ -257,7 +300,8 @@ class Parallax<T extends HTMLElement> {
                 console.error('Error requesting permission for device orientation:', error);
             }
         } else if ('ondeviceorientation' in window && 'ondevicemotion' in window) {
-            addOrientationAndMotionListeners(); // No permission needed, but supported
+            // No permission needed, but supported; still apply support delay before attaching event listeners
+            setTimeout(addOrientationAndMotionListeners, this.supportDelay);
         } else {
             console.error('Device orientation or motion is not supported by this device.');
         }
