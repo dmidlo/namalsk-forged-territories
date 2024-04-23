@@ -47,6 +47,10 @@ interface DeviceOrientationEventPermissions {
     requestPermission: () => Promise<'granted' | 'denied' | 'prompt'>;
 }
 
+interface DeviceMotionEventPermissions {
+    requestPermission: () => Promise<'granted' | 'denied' | 'prompt'>;
+}
+
 /**
  * Configuration options for setting up a parallax effect within a specified container.
  * Allows customization of the parallax system's responsiveness and behavior based on user interactions,
@@ -115,9 +119,9 @@ class Parallax<T extends HTMLElement> {
     private layers: NodeListOf<ParallaxLayer>;  // Configured parallax layers.
     private resizeObserver: ResizeObserver;  // Monitors size changes of the base element.
     private options: ParallaxOptions;  // Configurable options for behavior and responsiveness.
-    private moveTimeout: number | undefined;  // Timer for debouncing mouse move events.
-    private inputX: number = 0; // Default initialization to 0.
-    private inputY: number = 0; // Default initialization to 0.
+    private inputX: number = 0; // Default initialization to 0 to ensure value is always defined.
+    private inputY: number = 0; // Default initialization to 0 to ensure value is always defined.
+    private moveTimeout: number | undefined; // Explicitly mark as possibly undefined.
     public attachDeviceOrientationListener: () => Promise<void>;  // Asynchronously attaches a device orientation event listener.
 
     /**
@@ -166,7 +170,7 @@ class Parallax<T extends HTMLElement> {
         this.resizeObserver = new ResizeObserver(() => this.updateContainerAndLayers()); // Monitor size changes for dynamic responsiveness.
 
         this.initializeParallax(); // Complete the setup by initializing dimensions, attaching event handlers, and starting observers.
-        this.attachDeviceOrientationListener = this._attachDeviceOrientationListener.bind(this); // Prepare device orientation handling with permissions.
+        this.attachDeviceOrientationListener = this._attachDeviceOrientationAndMotionListener.bind(this); // Prepare device orientation handling with permissions.
 
         this.moveTimeout = undefined; // Setup variable for debouncing mouse move events.
     }
@@ -323,26 +327,18 @@ class Parallax<T extends HTMLElement> {
      * @param event - The MouseEvent object containing details about the cursor's current position.
      */
     private handleMouseMove(event: MouseEvent): void {
-        // Determine the center of the parallax container.
         const [centerX, centerY] = this.getCenterXY();
-
-        // Calculate the mouse's relative position within the parallax container.
         const mouseX = event.clientX - this.parallaxContainer.getBoundingClientRect().left;
         const mouseY = event.clientY - this.parallaxContainer.getBoundingClientRect().top;
-
-        // Iterate over each layer to compute and apply the parallax transformation.
-        this.layers.forEach(layer => {
-            // Compute the displacement influenced by depth and the smoothing factor.
-            let deltaX = (mouseX - centerX) * layer.depth * this.options.smoothingFactor!;
-            let deltaY = (mouseY - centerY) * layer.depth * this.options.smoothingFactor!;
-
-            // Restrict the displacement to within the predefined maximum range.
-            const boundX = Math.min(Math.max(deltaX, -layer.maxRange), layer.maxRange);
-            const boundY = Math.min(Math.max(deltaY, -layer.maxRange), layer.maxRange);
-
-            // Apply the constrained transformation to the layer.
-            layer.style.transform = `translate(${boundX}px, ${boundY}px)`;
-        });
+    
+        this.inputX = (mouseX - centerX) / centerX;
+        this.inputY = (mouseY - centerY) / centerY;
+    
+        const mouseModifierX = this.options.smoothingFactor || 0.1; // Default or specified smoothing factor for mouse.
+        const mouseModifierY = this.options.smoothingFactor || 0.1;
+    
+        // Apply transformations with mouse-specific modifiers.
+        this.applyLayerTransformations(mouseModifierX, mouseModifierY);
     }
 
     /**
@@ -385,19 +381,11 @@ class Parallax<T extends HTMLElement> {
      * @param gamma The device's tilt left-to-right in degrees, where positive values indicate tilting to the right.
      */
     private rotate(beta: number | null, gamma: number | null): void {
-        // Check for null inputs, which indicate unavailable orientation data
         if (beta === null || gamma === null) return;
-
-        // Default sensitivity to 30 if not explicitly set, affecting how responsive the effect is to device tilt
+    
         const sensitivity = this.options.sensitivity || 30;
-
-        // Normalize orientation inputs by sensitivity to compute parallax input values
-        let x = beta / sensitivity;
-        let y = gamma / sensitivity;
-
-        // Store the computed values for later use in layer position adjustments
-        this.inputX = x;
-        this.inputY = y;
+        this.inputX = beta / sensitivity;
+        this.inputY = gamma / sensitivity;
     }
 
     /**
@@ -419,19 +407,41 @@ class Parallax<T extends HTMLElement> {
      * - Default values for `gyroEffectModifier` ensure fail-safe operation if not explicitly set.
      */
     private handleDeviceOrientation(event: DeviceOrientationEvent): void {
-        // Extract the beta and gamma values from the orientation event.
         const { beta, gamma } = event;
+    
+        if (beta !== null && gamma !== null) {
+            this.rotate(beta, gamma);
+            const gyroModifierX = this.options.gyroEffectModifier || 10; // Default or specified gyro effect modifier.
+            const gyroModifierY = this.options.gyroEffectModifier || 10;
+    
+            // Apply transformations with gyro-specific modifiers.
+            this.applyLayerTransformations(gyroModifierX, gyroModifierY);
+        }
+    }
 
-        // Process orientation values to compute relative input values.
-        this.rotate(beta, gamma);
+    private handleDeviceMotion(event: DeviceMotionEvent): void {
+        // Ensure rotationRate is not null before attempting to destructure it
+        if (event.rotationRate) {
+            const { beta, gamma } = event.rotationRate;
+            if (beta !== null && gamma !== null) {
+                // Normalize orientation inputs by sensitivity
+                this.inputX = beta / (this.options.sensitivity || 30);
+                this.inputY = gamma / (this.options.sensitivity || 30);
+    
+                const motionModifierX = this.options.gyroEffectModifier || 10; // Example modifier for device motion.
+                const motionModifierY = this.options.gyroEffectModifier || 10;
+    
+                // Apply transformations with motion-specific modifiers.
+                this.applyLayerTransformations(motionModifierX, motionModifierY);
+            }
+        }
+    }
 
-        // Adjust each parallax layer based on the calculated input values.
+    private applyLayerTransformations(inputModifierX: number, inputModifierY: number): void {
+        // Apply transformations to all layers based on modified input values.
         this.layers.forEach(layer => {
-            // Calculate constrained displacements using the gyroEffectModifier and layer properties.
-            const deltaX = Math.min(Math.max(this.inputX * layer.depth * (this.options.gyroEffectModifier || 10), -layer.maxRange), layer.maxRange);
-            const deltaY = Math.min(Math.max(this.inputY * layer.depth * (this.options.gyroEffectModifier || 10), -layer.maxRange), layer.maxRange);
-
-            // Apply the calculated transformations to the layer's position.
+            const deltaX = this.inputX * layer.depth * inputModifierX;
+            const deltaY = this.inputY * layer.depth * inputModifierY;
             layer.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
         });
     }
@@ -472,42 +482,31 @@ class Parallax<T extends HTMLElement> {
      * - Handles possible exceptions during the permission request process.
      * - Logs an error if device orientation is unsupported.
      */
-    private async _attachDeviceOrientationListener() {
-        // Function to add the device orientation event listener.
-        const addOrientationListener = () => {
+    private async _attachDeviceOrientationAndMotionListener() {
+        const addOrientationAndMotionListeners = () => {
             window.addEventListener('deviceorientation', this.handleDeviceOrientation.bind(this));
+            window.addEventListener('devicemotion', this.handleDeviceMotion.bind(this));
         };
-
-        // Check if DeviceOrientationEvent is defined and supports the requestPermission method.
+    
+        // Check if DeviceOrientationEvent and DeviceMotionEvent support the requestPermission method.
         if (typeof DeviceOrientationEvent !== 'undefined' && 'requestPermission' in DeviceOrientationEvent) {
-            // Function to request permission on user gesture (click or touchend).
-            const requestPermissionOnUserGesture = async () => {
-                // Remove listeners to prevent multiple triggers.
-                document.removeEventListener('click', requestPermissionOnUserGesture);
-                document.removeEventListener('touchend', requestPermissionOnUserGesture);
-
-                try {
-                    // Request permission for device orientation.
-                    const permission = await (DeviceOrientationEvent as unknown as DeviceOrientationEventPermissions).requestPermission();
-                    if (permission === 'granted') {
-                        addOrientationListener();
-                    } else {
-                        console.error('Permission for device orientation was denied.');
-                    }
-                } catch (error) {
-                    console.error('Error requesting permission for device orientation:', error);
+            document.removeEventListener('click', this._attachDeviceOrientationAndMotionListener);
+            document.removeEventListener('touchend', this._attachDeviceOrientationAndMotionListener);
+    
+            try {
+                const permission = await (DeviceOrientationEvent as unknown as DeviceOrientationEventPermissions).requestPermission();
+                if (permission === 'granted') {
+                    addOrientationAndMotionListeners();
+                } else {
+                    console.error('Permission for device orientation was denied.');
                 }
-            };
-
-            // Attach listeners to document to trigger permission request on the first user interaction.
-            document.addEventListener('click', requestPermissionOnUserGesture);
-            document.addEventListener('touchend', requestPermissionOnUserGesture);
-        } else if ('ondeviceorientation' in window) {
-            // Add the event listener if permissions are not required.
-            addOrientationListener();
+            } catch (error) {
+                console.error('Error requesting permission for device orientation:', error);
+            }
+        } else if ('ondeviceorientation' in window && 'ondevicemotion' in window) {
+            addOrientationAndMotionListeners();
         } else {
-            // Log error if device orientation is unsupported.
-            console.error('Device orientation is not supported by this device.');
+            console.error('Device orientation or motion is not supported by this device.');
         }
     }
 
@@ -538,9 +537,9 @@ class Parallax<T extends HTMLElement> {
         // Attach device orientation listener, either on a user gesture or immediately based on browser policy.
         const gyroListenerTrigger = this.parallaxContainer.querySelector<HTMLElement>('[data-gyroscope-listener]');
         if (gyroListenerTrigger) {
-            gyroListenerTrigger.addEventListener('click', () => this._attachDeviceOrientationListener());
+            gyroListenerTrigger.addEventListener('click', () => this._attachDeviceOrientationAndMotionListener());
         } else {
-            this._attachDeviceOrientationListener(); // Fallback to attaching without user gesture if no specific element found.
+            this._attachDeviceOrientationAndMotionListener(); // Fallback to attaching without user gesture if no specific element found.
         }
 
         // Debounce window resize events to ensure parallax dimensions are updated efficiently after viewport changes.
