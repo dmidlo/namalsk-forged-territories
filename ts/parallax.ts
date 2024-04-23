@@ -27,6 +27,8 @@ interface ParallaxOptions {
     smoothingFactor?: number;  // Optional: Controls the motion smoothness, defaults can be set in the implementation if not provided.
     gyroEffectModifier?: number;  // Optional: Adjusts the sensitivity of device orientation-based movements.
     sensitivity?: number;
+    mouseDebounce?: number;
+    windowResizeDebounce?: number;
 }
 
 class Parallax<T extends HTMLElement> {
@@ -44,6 +46,8 @@ class Parallax<T extends HTMLElement> {
         const defaults: Partial<ParallaxOptions> = {
             smoothingFactor: 0.13, // Default smoothing factor for movement smoothness.
             gyroEffectModifier: 10, // Default gyro effect modifier for device orientation sensitivity.
+            mouseDebounce: 6, // Milliseconds delay before re-polling mouse coordinates.
+            windowResizeDebounce: 6, // Milliseconds delay before re-polling window dimensions during resize events.
         };
 
         // Calculate default sensitivity if not provided, adjusting for device and display characteristics.
@@ -65,7 +69,9 @@ class Parallax<T extends HTMLElement> {
 
         // Determine the base element for setting dimensions and reference for resizing.
         this.baseElement = this.findBaseElement();
-        this.resizeObserver = new ResizeObserver(() => this.updateContainerAndLayers()); // Monitor size changes for dynamic responsiveness.
+        this.resizeObserver = new ResizeObserver(() => this.updateContainerAndLayersOnWindowResize()); // Monitor size changes for dynamic responsiveness.
+        this.inputX = 0;
+        this.inputY = 0;
 
         this.initializeParallax(); // Complete the setup by initializing dimensions, attaching event handlers, and starting observers.
         this.attachDeviceOrientationListener = this._attachDeviceOrientationAndMotionListener.bind(this); // Prepare device orientation handling with permissions.
@@ -106,37 +112,17 @@ class Parallax<T extends HTMLElement> {
         this.resizeObserver.observe(this.baseElement);
     }
 
-    private updateContainerAndLayers(baseWidth: number = this.baseElement.offsetWidth, baseHeight: number = this.baseElement.offsetHeight): void {
-        // Apply the specified or current base element dimensions to the container's CSS properties.
+    private updateContainerAndLayersOnWindowResize(baseWidth: number = this.baseElement.offsetWidth, baseHeight: number = this.baseElement.offsetHeight): void {
         this.parallaxContainer.style.width = `${baseWidth}px`;
         this.parallaxContainer.style.height = `${baseHeight}px`;
     }
+    
 
     private getCenterXY(): [number, number] {
-        // Calculate the vertical center of the container.
-        const centerY = this.parallaxContainer.offsetHeight / 2;
-        // Calculate the horizontal center of the container.
-        const centerX = this.parallaxContainer.offsetWidth / 2;
-        // Return the calculated center coordinates.
+        // Return center of the base element, not the entire container to avoid using inflated values
+        const centerY = this.baseElement.offsetHeight / 2;
+        const centerX = this.baseElement.offsetWidth / 2;
         return [centerX, centerY];
-    }
-
-    private handleMouseMove(event: MouseEvent): void {
-        const [centerX, centerY] = this.getCenterXY();
-        const mouseX = event.clientX - this.parallaxContainer.getBoundingClientRect().left;
-        const mouseY = event.clientY - this.parallaxContainer.getBoundingClientRect().top;
-    
-        this.inputX = (mouseX - centerX) / centerX;
-        this.inputY = (mouseY - centerY) / centerY;
-    
-        const mouseModifierX = this.options.smoothingFactor ?? 0.1; // Default or specified smoothing factor for mouse.
-        const mouseModifierY = this.options.smoothingFactor ?? 0.1;
-        
-        // Request a frame to update layer transformations
-        window.requestAnimationFrame(() => {
-            // Apply transformations with mouse-specific modifiers.
-            this.applyLayerTransformations(mouseModifierX, mouseModifierY);
-        });
     }
 
     private computeSensitivity(): number {
@@ -154,55 +140,80 @@ class Parallax<T extends HTMLElement> {
         this.inputY = gamma / sensitivity;
     }
 
+    private handleMouseMove(event: MouseEvent): void {
+        const [centerX, centerY] = this.getCenterXY();
+        const mouseX = event.clientX - centerX - this.baseElement.getBoundingClientRect().left;
+        const mouseY = event.clientY - centerY - this.baseElement.getBoundingClientRect().top;
+    
+        this.inputX = mouseX / centerX;
+        this.inputY = mouseY / centerY;
+    
+        window.requestAnimationFrame(() => {
+            this.applyLayerTransformations(this.options.smoothingFactor!, this.options.smoothingFactor!, 'mouse');
+        });
+    }
+
     private handleDeviceOrientation(event: DeviceOrientationEvent): void {
         const { beta, gamma } = event;
     
         if (beta !== null && gamma !== null) {
             this.rotate(beta, gamma);
-            const gyroModifierX = this.options.gyroEffectModifier ?? 10; // Default or specified gyro effect modifier.
-            const gyroModifierY = this.options.gyroEffectModifier ?? 10;
+            const gyroModifier = this.options.gyroEffectModifier ?? 10;
     
-            // Request a frame to update layer transformations
             window.requestAnimationFrame(() => {
-                // Apply transformations with gyro-specific modifiers.
-                this.applyLayerTransformations(gyroModifierX, gyroModifierY);
+                this.applyLayerTransformations(gyroModifier, gyroModifier, 'gyro');
             });
         }
     }
 
     private handleDeviceMotion(event: DeviceMotionEvent): void {
-        // Ensure rotationRate is not null before attempting to destructure it
         if (event.rotationRate) {
             const { beta, gamma } = event.rotationRate;
+    
             if (beta !== null && gamma !== null) {
-                // Normalize orientation inputs by sensitivity
                 this.inputX = beta / (this.options.sensitivity ?? 30);
                 this.inputY = gamma / (this.options.sensitivity ?? 30);
     
-                const motionModifierX = this.options.gyroEffectModifier ?? 10; // Example modifier for device motion.
-                const motionModifierY = this.options.gyroEffectModifier ?? 10;
+                const motionModifier = this.options.gyroEffectModifier ?? 10;
     
-                
-                // Request a frame to update layer transformations
                 window.requestAnimationFrame(() => {
-                    // Apply transformations with motion-specific modifiers.
-                    this.applyLayerTransformations(motionModifierX, motionModifierY);
+                    this.applyLayerTransformations(motionModifier, motionModifier, 'motion');
                 });
             }
         }
     }
 
-    private applyLayerTransformations(inputModifierX: number, inputModifierY: number): void {
-        // Apply transformations to all layers based on modified input values.
-        this.layers.forEach(layer => {
-            const deltaX = this.inputX * layer.depth * inputModifierX;
-            const deltaY = this.inputY * layer.depth * inputModifierY;
-            layer.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
-        });
-    }
+    private applyLayerTransformations(inputModifierX: number, inputModifierY: number, eventOrigin: 'mouse' | 'gyro' | 'motion'): void {
+    const [centerX, centerY] = this.getCenterXY();
+
+    // Adjust input modifiers based on the event source to control responsiveness and effects
+    let modifierX = inputModifierX;
+    let modifierY = inputModifierY;
+    if (eventOrigin === 'gyro') {
+        // Gyro inputs can be more sensitive, so reduce the effect
+        modifierX *= 0.1;
+        modifierY *= 0.1;
+    } else if (eventOrigin === 'motion') {
+        // Device motion inputs often have larger range and variability
+        modifierX *= 0.05;
+        modifierY *= 0.05;
+    } // No additional scaling for mouse as it is already fairly direct
+
+    this.layers.forEach(layer => {
+        const { depth, maxRange } = layer;
+        // Calculate the allowed movement range while considering the modified sensitivity
+        const deltaX = Math.min(Math.max(-maxRange, this.inputX * depth * modifierX * centerX), maxRange);
+        const deltaY = Math.min(Math.max(-maxRange, this.inputY * depth * modifierY * centerY), maxRange);
+
+        // Apply the transform with calculated offsets and ensure movements are within the maximum range
+        layer.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+    });
+}
+
+
 
     private initializeParallax(): void {
-        this.updateContainerAndLayers();  // Set initial container and layer dimensions.
+        this.updateContainerAndLayersOnWindowResize();  // Set initial container and layer dimensions.
         this.attachEvents();  // Bind event handlers for interactive parallax effects.
         this.setupResizeObserver();  // Start observing for changes in container size.
     }
@@ -259,35 +270,17 @@ class Parallax<T extends HTMLElement> {
     }
 
     private attachEvents(): void {
-        // Apply the generic debounce method directly in the event listener registration
-        const debouncedMouseMove = this.debounce(this.handleMouseMove.bind(this), 6);
-        document.addEventListener('mousemove', debouncedMouseMove);
+        // Debounced mouse movement handling for optimized performance
+        const debouncedMouseMove = this.debounce(this.handleMouseMove.bind(this), this.options.mouseDebounce!);
+        this.parallaxContainer.addEventListener('mousemove', debouncedMouseMove);
     
-        // Enhance conditional attachment for device orientation
-        const gyroListenerTrigger = this.parallaxContainer.querySelector<HTMLElement>('[data-gyroscope-listener]');
-        if (gyroListenerTrigger) {
-                    gyroListenerTrigger.addEventListener('click', this._attachDeviceOrientationAndMotionListener.bind(this));
-                }
-        else if (typeof DeviceOrientationEvent === 'undefined' || !('requestPermission' in DeviceOrientationEvent)) {
-                        this._attachDeviceOrientationAndMotionListener();
-                    }
-    
-        // Using the generalized debounce method for resizing events
-        const debouncedResize = this.debounce(() => {
-            this.updateContainerAndLayers(window.innerWidth); // Update dimensions based on new viewport size.
-        }, 6);
-        window.addEventListener('resize', debouncedResize);
+        window.addEventListener('resize', this.debounce(() => {
+            // Update dimensions upon resizing
+            this.updateContainerAndLayersOnWindowResize(window.innerWidth, window.innerHeight);
+        }, this.options.windowResizeDebounce!));
     }
 }
 
-/**
- * Initializes the Parallax system once the HTML document is fully loaded.
- * This ensures that all DOM elements are available for manipulation and setup.
- * A new instance of the Parallax class is created with specified options,
- * specifying the container ID and an optional smoothing factor for the parallax effect.
- * The 'DOMContentLoaded' event is used to delay execution until the complete HTML document
- * has been fully loaded and parsed, ensuring that all elements referenced in the script are accessible.
- */
 document.addEventListener('DOMContentLoaded', () => {
     new Parallax<HTMLElement>({ containerId: 'parallaxContainer', smoothingFactor: 0.13, gyroEffectModifier: 10 });
 });
