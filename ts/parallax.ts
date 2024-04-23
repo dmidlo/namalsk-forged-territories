@@ -334,11 +334,14 @@ class Parallax<T extends HTMLElement> {
         this.inputX = (mouseX - centerX) / centerX;
         this.inputY = (mouseY - centerY) / centerY;
     
-        const mouseModifierX = this.options.smoothingFactor || 0.1; // Default or specified smoothing factor for mouse.
-        const mouseModifierY = this.options.smoothingFactor || 0.1;
-    
-        // Apply transformations with mouse-specific modifiers.
-        this.applyLayerTransformations(mouseModifierX, mouseModifierY);
+        const mouseModifierX = this.options.smoothingFactor ?? 0.1; // Default or specified smoothing factor for mouse.
+        const mouseModifierY = this.options.smoothingFactor ?? 0.1;
+        
+        // Request a frame to update layer transformations
+        window.requestAnimationFrame(() => {
+            // Apply transformations with mouse-specific modifiers.
+            this.applyLayerTransformations(mouseModifierX, mouseModifierY);
+        });
     }
 
     /**
@@ -381,9 +384,11 @@ class Parallax<T extends HTMLElement> {
      * @param gamma The device's tilt left-to-right in degrees, where positive values indicate tilting to the right.
      */
     private rotate(beta: number | null, gamma: number | null): void {
-        if (beta === null || gamma === null) return;
+        if (beta === null || gamma === null) {
+          return;
+        }
     
-        const sensitivity = this.options.sensitivity || 30;
+        const sensitivity = this.options.sensitivity ?? 30;
         this.inputX = beta / sensitivity;
         this.inputY = gamma / sensitivity;
     }
@@ -411,11 +416,14 @@ class Parallax<T extends HTMLElement> {
     
         if (beta !== null && gamma !== null) {
             this.rotate(beta, gamma);
-            const gyroModifierX = this.options.gyroEffectModifier || 10; // Default or specified gyro effect modifier.
-            const gyroModifierY = this.options.gyroEffectModifier || 10;
+            const gyroModifierX = this.options.gyroEffectModifier ?? 10; // Default or specified gyro effect modifier.
+            const gyroModifierY = this.options.gyroEffectModifier ?? 10;
     
-            // Apply transformations with gyro-specific modifiers.
-            this.applyLayerTransformations(gyroModifierX, gyroModifierY);
+            // Request a frame to update layer transformations
+            window.requestAnimationFrame(() => {
+                // Apply transformations with gyro-specific modifiers.
+                this.applyLayerTransformations(gyroModifierX, gyroModifierY);
+            });
         }
     }
 
@@ -425,14 +433,18 @@ class Parallax<T extends HTMLElement> {
             const { beta, gamma } = event.rotationRate;
             if (beta !== null && gamma !== null) {
                 // Normalize orientation inputs by sensitivity
-                this.inputX = beta / (this.options.sensitivity || 30);
-                this.inputY = gamma / (this.options.sensitivity || 30);
+                this.inputX = beta / (this.options.sensitivity ?? 30);
+                this.inputY = gamma / (this.options.sensitivity ?? 30);
     
-                const motionModifierX = this.options.gyroEffectModifier || 10; // Example modifier for device motion.
-                const motionModifierY = this.options.gyroEffectModifier || 10;
+                const motionModifierX = this.options.gyroEffectModifier ?? 10; // Example modifier for device motion.
+                const motionModifierY = this.options.gyroEffectModifier ?? 10;
     
-                // Apply transformations with motion-specific modifiers.
-                this.applyLayerTransformations(motionModifierX, motionModifierY);
+                
+                // Request a frame to update layer transformations
+                window.requestAnimationFrame(() => {
+                    // Apply transformations with motion-specific modifiers.
+                    this.applyLayerTransformations(motionModifierX, motionModifierY);
+                });
             }
         }
     }
