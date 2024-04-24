@@ -142,7 +142,7 @@ class Parallax<T extends HTMLElement> {
     }
 
     private computeSensitivity(): number {
-        const aspectRatio = this.baseElement.offsetWidth / this.baseElement.offsetHeight;
+        const aspectRatio = window.innerWidth / window.innerHeight;
         return aspectRatio * 2;  // Multiply aspect ratio by 10 to derive a basic sensitivity level.
     }
 
