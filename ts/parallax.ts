@@ -51,7 +51,6 @@ class Parallax<T extends HTMLElement> {
     private calibrateX: boolean = false;
     private calibrateY: boolean = true;
     private calibrationTimer?: number;
-    private calibrationFlag: boolean = true;
     private calibrationX: number = 0;
     private calibrationY: number = 0;
     public attachDeviceOrientationListener: () => Promise<void>;  // Asynchronously attaches a device orientation event listener.
@@ -147,40 +146,49 @@ class Parallax<T extends HTMLElement> {
     }
 
     private initialOrientationCalibration(): void {
-        window.addEventListener('deviceorientation', (event: DeviceOrientationEvent) => {
+        // Initial orientation calibration captures the first stable beta and gamma values when the device is motionless.
+        const initialOrientationListener = (event: DeviceOrientationEvent) => {
             if (this.initialOrientation.beta === null || this.initialOrientation.gamma === null) {
                 this.initialOrientation.beta = event.beta;
                 this.initialOrientation.gamma = event.gamma;
-                window.removeEventListener('deviceorientation', this.initialOrientationCalibration);
+                // After initial values are set, remove this listener to prevent recalibration.
+                window.removeEventListener('deviceorientation', initialOrientationListener);
             }
-        });
+        };
+        window.addEventListener('deviceorientation', initialOrientationListener);
     }
 
     private onCalibrationTimer(): void {
-        // Resets the calibration flag to trigger new calibration on the next appropriate event
-        this.calibrationFlag = true;
+        this.continuousCalibrationData.beta = [];
+        this.continuousCalibrationData.gamma = [];
     }
 
     private queueCalibration(delay: number): void {
-        // Debounce calibration attempts
+        // Calibration is queued with a delay to allow the device orientation to stabilize
         clearTimeout(this.calibrationTimer);
         this.calibrationTimer = window.setTimeout(() => this.onCalibrationTimer(), delay);
     }
 
-    public calibrate(x?: boolean, y?: boolean): void {
-        // Optionally set calibration axis
-        this.calibrateX = x !== undefined ? x : this.calibrateX;
-        this.calibrateY = y !== undefined ? y : this.calibrateY;
-    }
-
     private applyCalibration(inputX: number, inputY: number): [number, number] {
-        // Apply calibration to input values. If the difference between input and calibration exceeds the threshold, adjust the input by subtracting the calibration offset.
-        if (Math.abs(inputX - this.calibrationX) > this.calibrationThreshold) {
-            inputX -= this.calibrationX;
+        // Continuous calibration updates the calibration offsets using a moving average approach.
+        if (this.continuousCalibrationData.beta.length >= this.calibrationThreshold) {
+            // Calculate the moving averages for beta and gamma
+            const avgBeta = this.continuousCalibrationData.beta.reduce((acc, value) => acc + value, 0) / this.continuousCalibrationData.beta.length;
+            const avgGamma = this.continuousCalibrationData.gamma.reduce((acc, value) => acc + value, 0) / this.continuousCalibrationData.gamma.length;
+            
+            // Update calibration offsets
+            this.calibrationX = avgBeta;
+            this.calibrationY = avgGamma;
+    
+            // Clear the arrays to start collecting new data points for the next average calculation
+            this.continuousCalibrationData.beta = [];
+            this.continuousCalibrationData.gamma = [];
         }
-        if (Math.abs(inputY - this.calibrationY) > this.calibrationThreshold) {
-            inputY -= this.calibrationY;
-        }
+    
+        // Adjust input by subtracting the calibration values
+        inputX -= this.calibrationX;
+        inputY -= this.calibrationY;
+    
         return [inputX, inputY];
     }
 
@@ -188,25 +196,21 @@ class Parallax<T extends HTMLElement> {
         if (beta === null || gamma === null) {
             return;
         }
-
-        // Continuously update calibration
-        const averageBeta = this.continuousCalibrationData.beta.reduce((a, b) => a + b, 0) / this.continuousCalibrationData.beta.length;
-        const averageGamma = this.continuousCalibrationData.gamma.reduce((a, b) => a + b, 0) / this.continuousCalibrationData.gamma.length;
-        
-        const isPortrait = window.innerHeight > window.innerWidth;
-        let inputX = isPortrait ? gamma - averageGamma : beta - averageBeta;
-        let inputY = isPortrait ? beta - averageBeta : gamma - averageGamma;
-
-        if (this.calibrationFlag) {
-            this.calibrationFlag = false;
-            this.calibrationX = inputX;
-            this.calibrationY = inputY;
-        }
-
-        [inputX, inputY] = this.applyCalibration(inputX, inputY);
-        const sensitivity = this.options.sensitivity ?? 1;
-        this.inputX = inputX / sensitivity;
-        this.inputY = inputY / sensitivity;
+    
+        // Adjust the beta and gamma based on the initial orientation calibration
+        beta -= this.initialOrientation.beta!;
+        gamma -= this.initialOrientation.gamma!;
+    
+        // Add current beta and gamma to the continuous calibration data
+        this.continuousCalibrationData.beta.push(beta);
+        this.continuousCalibrationData.gamma.push(gamma);
+    
+        // Call calibration function which will adjust inputX and inputY
+        let [calibratedX, calibratedY] = this.applyCalibration(beta, gamma);
+    
+        // Store the calibrated values to be used in animations or transformations
+        this.inputX = calibratedX;
+        this.inputY = calibratedY;
     }
 
     private handleMouseMove(event: MouseEvent): void {
@@ -224,15 +228,13 @@ class Parallax<T extends HTMLElement> {
 
     private handleDeviceOrientation(event: DeviceOrientationEvent): void {
         const { beta, gamma } = event;
-    
         if (beta !== null && gamma !== null) {
             this.rotate(beta, gamma);
-            const gyroModifier = this.options.gyroEffectModifier ?? 1;
-    
+            // Process transformation based on calibrated values
             window.requestAnimationFrame(() => {
-                let [calibratedX, calibratedY] = this.applyCalibration(this.inputX, this.inputY);
-                // Applying layer transformations using calibrated values
-                this.applyLayerTransformations(calibratedX * gyroModifier, calibratedY * gyroModifier, 'gyro');
+                let gyroModifier = this.options.gyroEffectModifier ?? 1;
+                // Apply layer transformations using calibrated values
+                this.applyLayerTransformations(this.inputX * gyroModifier, this.inputY * gyroModifier, 'gyro');
             });
         }
     }
@@ -240,20 +242,12 @@ class Parallax<T extends HTMLElement> {
     private handleDeviceMotion(event: DeviceMotionEvent): void {
         if (event.rotationRate) {
             const { beta, gamma } = event.rotationRate;
-    
+        
             if (beta !== null && gamma !== null) {
-                this.continuousCalibrationData.beta.push(beta);
-                this.continuousCalibrationData.gamma.push(gamma);
-                // Use the rotate method to adjust inputX and inputY based on the device orientation
-                if (this.continuousCalibrationData.beta.length > 50) { // Adjust buffer size as needed
-                    this.continuousCalibrationData.beta.shift();
-                    this.continuousCalibrationData.gamma.shift();
-                }
                 this.rotate(beta, gamma);
-    
-                const motionModifier = this.options.gyroEffectModifier ?? 10;
-    
+        
                 window.requestAnimationFrame(() => {
+                    const motionModifier = this.options.gyroEffectModifier ?? 10;
                     // Apply transformations to layers using the modified inputs and a specific modifier for device motion
                     this.applyLayerTransformations(motionModifier, motionModifier, 'motion');
                 });
@@ -314,8 +308,8 @@ class Parallax<T extends HTMLElement> {
                 const permission = await (DeviceOrientationEvent as unknown as DeviceOrientationEventPermissions).requestPermission();
                 if (permission === 'granted') {
                     // Use support delay to debounce the addition of orientation and motion listeners
-                    setTimeout(addOrientationAndMotionListeners, this.supportDelay);
                     this.initialOrientationCalibration();
+                    setTimeout(addOrientationAndMotionListeners, this.supportDelay);
                 } else {
                     console.error('Permission for device orientation was denied.');
                 }
@@ -324,8 +318,8 @@ class Parallax<T extends HTMLElement> {
             }
         } else if ('ondeviceorientation' in window && 'ondevicemotion' in window) {
             // No permission needed, but supported; still apply support delay before attaching event listeners
-            setTimeout(addOrientationAndMotionListeners, this.supportDelay);
             this.initialOrientationCalibration();
+            setTimeout(addOrientationAndMotionListeners, this.supportDelay);
         } else {
             console.error('Device orientation or motion is not supported by this device.');
         }
