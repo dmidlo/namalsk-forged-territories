@@ -13,7 +13,7 @@ class Parallax {
     calibrationThreshold = 100;
     calibrationDelay = 500;
     supportDelay = 500;
-    calibrateX = false;
+    calibrateX = true;
     calibrateY = true;
     calibrationTimer;
     calibrationX = 0;

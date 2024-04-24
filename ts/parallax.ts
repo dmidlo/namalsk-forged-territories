@@ -48,7 +48,7 @@ class Parallax<T extends HTMLElement> {
     private calibrationThreshold: number = 100;
     private calibrationDelay: number = 500;
     private supportDelay: number = 500;
-    private calibrateX: boolean = false;
+    private calibrateX: boolean = true;
     private calibrateY: boolean = true;
     private calibrationTimer?: number;
     private calibrationX: number = 0;
