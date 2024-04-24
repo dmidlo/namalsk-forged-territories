@@ -59,7 +59,7 @@ class Parallax<T extends HTMLElement> {
     constructor(options: ParallaxOptions) {
         const defaults: Partial<ParallaxOptions> = {
             mouseSmoothingFactor: 0.13, // Default smoothing factor for movement smoothness.
-            gyroEffectModifier: 2, // Default gyro effect modifier for device orientation sensitivity.
+            gyroEffectModifier: 1, // Default gyro effect modifier for device orientation sensitivity.
             mouseDebounce: 6, // Milliseconds delay before re-polling mouse coordinates.
             windowResizeDebounce: 6, // Milliseconds delay before re-polling window dimensions during resize events.
             deviceDebounce: 6, // Milliseconds delay before re-polling device motion and event metrics.
@@ -142,7 +142,7 @@ class Parallax<T extends HTMLElement> {
     }
 
     private computeSensitivity(): number {
-        const aspectRatio = window.innerWidth / window.innerHeight;
+        const aspectRatio = this.baseElement.offsetWidth / this.baseElement.offsetHeight;
         return aspectRatio * 2;  // Multiply aspect ratio by 10 to derive a basic sensitivity level.
     }
 
@@ -204,7 +204,7 @@ class Parallax<T extends HTMLElement> {
         }
 
         [inputX, inputY] = this.applyCalibration(inputX, inputY);
-        const sensitivity = this.options.sensitivity ?? 30;
+        const sensitivity = this.options.sensitivity ?? 1;
         this.inputX = inputX / sensitivity;
         this.inputY = inputY / sensitivity;
     }
@@ -227,7 +227,7 @@ class Parallax<T extends HTMLElement> {
     
         if (beta !== null && gamma !== null) {
             this.rotate(beta, gamma);
-            const gyroModifier = this.options.gyroEffectModifier ?? 10;
+            const gyroModifier = this.options.gyroEffectModifier ?? 1;
     
             window.requestAnimationFrame(() => {
                 let [calibratedX, calibratedY] = this.applyCalibration(this.inputX, this.inputY);
@@ -269,12 +269,12 @@ class Parallax<T extends HTMLElement> {
         let modifierY = inputModifierY;
         if (eventOrigin === 'gyro') {
             // Gyro inputs can be more sensitive, so reduce the effect
-            modifierX *= 0.05;
-            modifierY *= 0.05;
-        } else if (eventOrigin === 'motion') {
-            // Device motion inputs often have larger range and variability
             modifierX *= 0.025;
             modifierY *= 0.025;
+        } else if (eventOrigin === 'motion') {
+            // Device motion inputs often have larger range and variability
+            modifierX *= 0.012;
+            modifierY *= 0.012;
         } // No additional scaling for mouse as it is already fairly direct
 
         this.layers.forEach(layer => {
