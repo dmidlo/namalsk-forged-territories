@@ -101,6 +101,11 @@ class Parallax {
             if (this.initialOrientation.beta === null || this.initialOrientation.gamma === null) {
                 this.initialOrientation.beta = event.beta;
                 this.initialOrientation.gamma = event.gamma;
+                // Adjust initial values if device is facing downward
+                if (event.beta > 90 || event.beta < -90) {
+                    this.initialOrientation.beta = 180 - event.beta;
+                    this.initialOrientation.gamma = -event.gamma;
+                }
                 // After initial values are set, remove this listener to prevent recalibration.
                 window.removeEventListener('deviceorientation', initialOrientationListener);
             }
@@ -141,7 +146,7 @@ class Parallax {
         // Adjust the beta and gamma based on the initial orientation calibration
         beta -= this.initialOrientation.beta;
         gamma -= this.initialOrientation.gamma;
-        // Add current beta and gamma to the continuous calibration data
+        // Consider the ergonomic handling, adapting to different user grips and orientations
         this.continuousCalibrationData.beta.push(beta);
         this.continuousCalibrationData.gamma.push(gamma);
         // Call calibration function which will adjust inputX and inputY
@@ -161,8 +166,19 @@ class Parallax {
         });
     }
     handleDeviceOrientation(event) {
-        const { beta, gamma } = event;
+        let { beta, gamma } = event;
+        // Adapt beta and gamma based on orientation and positioning requirements.
         if (beta !== null && gamma !== null) {
+            // Check for supine position, where the device is likely facing downward
+            if (beta > 90 || beta < -90) {
+                beta = 180 - beta;
+                gamma = -gamma;
+            }
+            else if (Math.abs(beta) < 10 && Math.abs(gamma) < 10) {
+                // Device is likely in a flat, upward-facing position
+                beta = 0;
+                gamma = 0;
+            }
             this.rotate(beta, gamma);
             // Process transformation based on calibrated values
             window.requestAnimationFrame(() => {

@@ -146,17 +146,22 @@ class Parallax<T extends HTMLElement> {
     }
 
     private initialOrientationCalibration(): void {
-        // Initial orientation calibration captures the first stable beta and gamma values when the device is motionless.
-        const initialOrientationListener = (event: DeviceOrientationEvent) => {
-            if (this.initialOrientation.beta === null || this.initialOrientation.gamma === null) {
-                this.initialOrientation.beta = event.beta;
-                this.initialOrientation.gamma = event.gamma;
-                // After initial values are set, remove this listener to prevent recalibration.
-                window.removeEventListener('deviceorientation', initialOrientationListener);
+    // Initial orientation calibration captures the first stable beta and gamma values when the device is motionless.
+    const initialOrientationListener = (event: DeviceOrientationEvent) => {
+        if (this.initialOrientation.beta === null || this.initialOrientation.gamma === null) {
+            this.initialOrientation.beta = event.beta;
+            this.initialOrientation.gamma = event.gamma;
+            // Adjust initial values if device is facing downward
+            if (event.beta! > 90 || event.beta! < -90) {
+                this.initialOrientation.beta = 180 - event.beta!;
+                this.initialOrientation.gamma = -event.gamma!;
             }
-        };
-        window.addEventListener('deviceorientation', initialOrientationListener);
-    }
+            // After initial values are set, remove this listener to prevent recalibration.
+            window.removeEventListener('deviceorientation', initialOrientationListener);
+        }
+    };
+    window.addEventListener('deviceorientation', initialOrientationListener);
+}
 
     private onCalibrationTimer(): void {
         this.continuousCalibrationData.beta = [];
@@ -193,25 +198,25 @@ class Parallax<T extends HTMLElement> {
     }
 
     private rotate(beta: number | null, gamma: number | null): void {
-        if (beta === null || gamma === null) {
-            return;
-        }
-    
-        // Adjust the beta and gamma based on the initial orientation calibration
-        beta -= this.initialOrientation.beta!;
-        gamma -= this.initialOrientation.gamma!;
-    
-        // Add current beta and gamma to the continuous calibration data
-        this.continuousCalibrationData.beta.push(beta);
-        this.continuousCalibrationData.gamma.push(gamma);
-    
-        // Call calibration function which will adjust inputX and inputY
-        let [calibratedX, calibratedY] = this.applyCalibration(beta, gamma);
-    
-        // Store the calibrated values to be used in animations or transformations
-        this.inputX = calibratedX;
-        this.inputY = calibratedY;
+    if (beta === null || gamma === null) {
+        return;
     }
+
+    // Adjust the beta and gamma based on the initial orientation calibration
+    beta -= this.initialOrientation.beta!;
+    gamma -= this.initialOrientation.gamma!;
+
+    // Consider the ergonomic handling, adapting to different user grips and orientations
+    this.continuousCalibrationData.beta.push(beta);
+    this.continuousCalibrationData.gamma.push(gamma);
+
+    // Call calibration function which will adjust inputX and inputY
+    let [calibratedX, calibratedY] = this.applyCalibration(beta, gamma);
+
+    // Store the calibrated values to be used in animations or transformations
+    this.inputX = calibratedX;
+    this.inputY = calibratedY;
+}
 
     private handleMouseMove(event: MouseEvent): void {
         const [centerX, centerY] = this.getCenterXY();
@@ -227,17 +232,30 @@ class Parallax<T extends HTMLElement> {
     }
 
     private handleDeviceOrientation(event: DeviceOrientationEvent): void {
-        const { beta, gamma } = event;
-        if (beta !== null && gamma !== null) {
-            this.rotate(beta, gamma);
-            // Process transformation based on calibrated values
-            window.requestAnimationFrame(() => {
-                let gyroModifier = this.options.gyroEffectModifier ?? 1;
-                // Apply layer transformations using calibrated values
-                this.applyLayerTransformations(this.inputX * gyroModifier, this.inputY * gyroModifier, 'gyro');
-            });
+    let { beta, gamma } = event;
+
+    // Adapt beta and gamma based on orientation and positioning requirements.
+    if (beta !== null && gamma !== null) {
+        // Check for supine position, where the device is likely facing downward
+        if (beta > 90 || beta < -90) {
+            beta = 180 - beta;
+            gamma = -gamma;
+        } else if (Math.abs(beta) < 10 && Math.abs(gamma) < 10) {
+            // Device is likely in a flat, upward-facing position
+            beta = 0;
+            gamma = 0;
         }
+
+        this.rotate(beta, gamma);
+        // Process transformation based on calibrated values
+        window.requestAnimationFrame(() => {
+            let gyroModifier = this.options.gyroEffectModifier ?? 1;
+            // Apply layer transformations using calibrated values
+            this.applyLayerTransformations(this.inputX * gyroModifier, this.inputY * gyroModifier, 'gyro');
+        });
     }
+}
+
 
     private handleDeviceMotion(event: DeviceMotionEvent): void {
         if (event.rotationRate) {
@@ -290,40 +308,41 @@ class Parallax<T extends HTMLElement> {
     }
 
     private async _attachDeviceOrientationAndMotionListener() {
-        const addOrientationAndMotionListeners = () => {
-            window.addEventListener('deviceorientation', this.handleDeviceOrientation.bind(this));
-            window.addEventListener('devicemotion', this.handleDeviceMotion.bind(this));
-        };
+    const addOrientationAndMotionListeners = () => {
+        window.addEventListener('deviceorientation', this.handleDeviceOrientation.bind(this));
+        window.addEventListener('devicemotion', this.handleDeviceMotion.bind(this));
+    };
 
-        // Unify event removal to simplify permission handling
-        const removeGestureListeners = () => {
-            document.removeEventListener('click', this._attachDeviceOrientationAndMotionListener);
-            document.removeEventListener('touchend', this._attachDeviceOrientationAndMotionListener);
-        };
+    // Unify event removal to simplify permission handling
+    const removeGestureListeners = () => {
+        document.removeEventListener('click', this._attachDeviceOrientationAndMotionListener);
+        document.removeEventListener('touchend', this._attachDeviceOrientationAndMotionListener);
+    };
 
-        if (typeof DeviceOrientationEvent !== 'undefined' && 'requestPermission' in DeviceOrientationEvent) {
-            removeGestureListeners(); // Assume permission needs to be requested once per session
+    if (typeof DeviceOrientationEvent !== 'undefined' && 'requestPermission' in DeviceOrientationEvent) {
+        removeGestureListeners(); // Assume permission needs to be requested once per session
 
-            try {
-                const permission = await (DeviceOrientationEvent as unknown as DeviceOrientationEventPermissions).requestPermission();
-                if (permission === 'granted') {
-                    // Use support delay to debounce the addition of orientation and motion listeners
-                    this.initialOrientationCalibration();
-                    setTimeout(addOrientationAndMotionListeners, this.supportDelay);
-                } else {
-                    console.error('Permission for device orientation was denied.');
-                }
-            } catch (error) {
-                console.error('Error requesting permission for device orientation:', error);
+        try {
+            const permission = await (DeviceOrientationEvent as unknown as DeviceOrientationEventPermissions).requestPermission();
+            if (permission === 'granted') {
+                // Use support delay to debounce the addition of orientation and motion listeners
+                this.initialOrientationCalibration();
+                setTimeout(addOrientationAndMotionListeners, this.supportDelay);
+            } else {
+                console.error('Permission for device orientation was denied.');
             }
-        } else if ('ondeviceorientation' in window && 'ondevicemotion' in window) {
-            // No permission needed, but supported; still apply support delay before attaching event listeners
-            this.initialOrientationCalibration();
-            setTimeout(addOrientationAndMotionListeners, this.supportDelay);
-        } else {
-            console.error('Device orientation or motion is not supported by this device.');
+        } catch (error) {
+            console.error('Error requesting permission for device orientation:', error);
         }
+    } else if ('ondeviceorientation' in window && 'ondevicemotion' in window) {
+        // No permission needed, but supported; still apply support delay before attaching event listeners
+        this.initialOrientationCalibration();
+        setTimeout(addOrientationAndMotionListeners, this.supportDelay);
+    } else {
+        console.error('Device orientation or motion is not supported by this device.');
     }
+}
+
 
     private debounce(func: (...args: any[]) => void, wait: number, immediate: boolean = false): (...args: any[]) => void {
         let timeout: number | undefined;
