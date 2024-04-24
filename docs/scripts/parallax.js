@@ -179,6 +179,10 @@ class Parallax {
                 beta = 0;
                 gamma = 0;
             }
+            // Check for prone position adaptations, if the device is facing upwards while the user is lying face down
+            if (beta < -90) {
+                beta = -180 - beta;
+            }
             this.rotate(beta, gamma);
             // Process transformation based on calibrated values
             window.requestAnimationFrame(() => {

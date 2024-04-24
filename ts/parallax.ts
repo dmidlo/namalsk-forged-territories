@@ -198,25 +198,25 @@ class Parallax<T extends HTMLElement> {
     }
 
     private rotate(beta: number | null, gamma: number | null): void {
-    if (beta === null || gamma === null) {
-        return;
+        if (beta === null || gamma === null) {
+            return;
+        }
+    
+        // Adjust the beta and gamma based on the initial orientation calibration
+        beta -= this.initialOrientation.beta!;
+        gamma -= this.initialOrientation.gamma!;
+    
+        // Consider the ergonomic handling, adapting to different user grips and orientations
+        this.continuousCalibrationData.beta.push(beta);
+        this.continuousCalibrationData.gamma.push(gamma);
+    
+        // Call calibration function which will adjust inputX and inputY
+        let [calibratedX, calibratedY] = this.applyCalibration(beta, gamma);
+    
+        // Store the calibrated values to be used in animations or transformations
+        this.inputX = calibratedX;
+        this.inputY = calibratedY;
     }
-
-    // Adjust the beta and gamma based on the initial orientation calibration
-    beta -= this.initialOrientation.beta!;
-    gamma -= this.initialOrientation.gamma!;
-
-    // Consider the ergonomic handling, adapting to different user grips and orientations
-    this.continuousCalibrationData.beta.push(beta);
-    this.continuousCalibrationData.gamma.push(gamma);
-
-    // Call calibration function which will adjust inputX and inputY
-    let [calibratedX, calibratedY] = this.applyCalibration(beta, gamma);
-
-    // Store the calibrated values to be used in animations or transformations
-    this.inputX = calibratedX;
-    this.inputY = calibratedY;
-}
 
     private handleMouseMove(event: MouseEvent): void {
         const [centerX, centerY] = this.getCenterXY();
@@ -232,29 +232,34 @@ class Parallax<T extends HTMLElement> {
     }
 
     private handleDeviceOrientation(event: DeviceOrientationEvent): void {
-    let { beta, gamma } = event;
-
-    // Adapt beta and gamma based on orientation and positioning requirements.
-    if (beta !== null && gamma !== null) {
-        // Check for supine position, where the device is likely facing downward
-        if (beta > 90 || beta < -90) {
-            beta = 180 - beta;
-            gamma = -gamma;
-        } else if (Math.abs(beta) < 10 && Math.abs(gamma) < 10) {
-            // Device is likely in a flat, upward-facing position
-            beta = 0;
-            gamma = 0;
+        let { beta, gamma } = event;
+    
+        // Adapt beta and gamma based on orientation and positioning requirements.
+        if (beta !== null && gamma !== null) {
+            // Check for supine position, where the device is likely facing downward
+            if (beta > 90 || beta < -90) {
+                beta = 180 - beta;
+                gamma = -gamma;
+            } else if (Math.abs(beta) < 10 && Math.abs(gamma) < 10) {
+                // Device is likely in a flat, upward-facing position
+                beta = 0;
+                gamma = 0;
+            }
+    
+            // Check for prone position adaptations, if the device is facing upwards while the user is lying face down
+            if (beta < -90) {
+                beta = -180 - beta;
+            }
+    
+            this.rotate(beta, gamma);
+            // Process transformation based on calibrated values
+            window.requestAnimationFrame(() => {
+                let gyroModifier = this.options.gyroEffectModifier ?? 1;
+                // Apply layer transformations using calibrated values
+                this.applyLayerTransformations(this.inputX * gyroModifier, this.inputY * gyroModifier, 'gyro');
+            });
         }
-
-        this.rotate(beta, gamma);
-        // Process transformation based on calibrated values
-        window.requestAnimationFrame(() => {
-            let gyroModifier = this.options.gyroEffectModifier ?? 1;
-            // Apply layer transformations using calibrated values
-            this.applyLayerTransformations(this.inputX * gyroModifier, this.inputY * gyroModifier, 'gyro');
-        });
     }
-}
 
 
     private handleDeviceMotion(event: DeviceMotionEvent): void {
